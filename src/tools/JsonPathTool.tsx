@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { JSONPath } from 'jsonpath-plus';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE = `{
   "loja": {
@@ -24,9 +25,17 @@ interface Match {
   value: unknown;
 }
 
-export default function JsonPathTool() {
-  const [text, setText] = usePersistentState('jsonpath:text', SAMPLE);
-  const [query, setQuery] = usePersistentState('jsonpath:query', '$.loja.livros[*].titulo');
+export default function JsonPathTool({ tabId }: { tabId: string }) {
+  const isFirst = tabId === DEFAULT_TAB_ID;
+  const [text, setText] = usePersistentState(
+    `jsonpath:${tabId}:text`,
+    isFirst ? loadPersisted('jsonpath:text', SAMPLE) : SAMPLE,
+  );
+  const [query, setQuery] = usePersistentState(
+    `jsonpath:${tabId}:query`,
+    isFirst ? loadPersisted('jsonpath:query', '$.loja.livros[*].titulo') : '$.loja.livros[*].titulo',
+  );
+  // Histórico de consultas é compartilhado entre as abas (expressões são reutilizáveis)
   const [history, setHistory] = usePersistentState<string[]>('jsonpath:history', []);
 
   const parsed = useMemo(() => tryParseJson(text), [text]);
