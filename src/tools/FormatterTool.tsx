@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson, sortKeysDeep, computeStats, formatBytes, downloadText } from '../lib/jsonUtils';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE = `{
   "produto": "Notebook",
@@ -13,8 +14,10 @@ const SAMPLE = `{
   "desconto": null
 }`;
 
-export default function FormatterTool() {
-  const [text, setText] = usePersistentState('formatter:text', '');
+export default function FormatterTool({ tabId }: { tabId: string }) {
+  // Dados da versão sem abas migram para a primeira aba
+  const legacy = tabId === DEFAULT_TAB_ID ? loadPersisted('formatter:text', '') : '';
+  const [text, setText] = usePersistentState(`formatter:${tabId}:text`, legacy);
   const [indent, setIndent] = usePersistentState<'2' | '4' | 'tab'>('formatter:indent', '2');
   const fileRef = useRef<HTMLInputElement>(null);
 

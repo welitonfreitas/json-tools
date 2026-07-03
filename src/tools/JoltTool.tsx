@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { joltTransform, SUPPORTED_OPERATIONS, Json } from '../lib/jolt';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE_INPUT = `{
   "rating": {
@@ -52,12 +53,24 @@ function entryTitle(e: JoltHistoryEntry): string {
   return 'spec inválida';
 }
 
-export default function JoltTool() {
-  const [input, setInput] = usePersistentState('jolt:input', SAMPLE_INPUT);
-  const [spec, setSpec] = usePersistentState('jolt:spec', SAMPLE_SPEC);
-  const [history, setHistory] = usePersistentState<JoltHistoryEntry[]>('jolt:history', []);
-  const [output, setOutput] = useState('');
-  const [error, setError] = useState<string | null>(null);
+export default function JoltTool({ tabId }: { tabId: string }) {
+  const isFirst = tabId === DEFAULT_TAB_ID;
+  const [input, setInput] = usePersistentState(
+    `jolt:${tabId}:input`,
+    isFirst ? loadPersisted('jolt:input', SAMPLE_INPUT) : SAMPLE_INPUT,
+  );
+  const [spec, setSpec] = usePersistentState(
+    `jolt:${tabId}:spec`,
+    isFirst ? loadPersisted('jolt:spec', SAMPLE_SPEC) : SAMPLE_SPEC,
+  );
+  // Histórico por aba: cada payload mantém seu próprio registro de execuções
+  const [history, setHistory] = usePersistentState<JoltHistoryEntry[]>(
+    `jolt:${tabId}:history`,
+    isFirst ? loadPersisted<JoltHistoryEntry[]>('jolt:history', []) : [],
+  );
+  // Saída persistida por aba, para comparar resultados alternando entre abas
+  const [output, setOutput] = usePersistentState(`jolt:${tabId}:output`, '');
+  const [error, setError] = usePersistentState<string | null>(`jolt:${tabId}:error`, null);
   const [showHelp, setShowHelp] = useState(false);
 
   const execute = () => {

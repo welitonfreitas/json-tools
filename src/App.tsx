@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ThemeContext, Theme } from './theme';
 import { loadPersisted, savePersisted } from './lib/persist';
+import TabbedTool from './components/Tabs';
 import FormatterTool from './tools/FormatterTool';
 import TreeTool from './tools/TreeTool';
 import EscapeTool from './tools/EscapeTool';
@@ -13,7 +14,7 @@ interface ToolDef {
   name: string;
   icon: string;
   description: string;
-  component: () => JSX.Element;
+  render: (tabId: string) => JSX.Element;
 }
 
 const TOOLS: ToolDef[] = [
@@ -22,42 +23,42 @@ const TOOLS: ToolDef[] = [
     name: 'Formatar & Validar',
     icon: '{ }',
     description: 'Formate, minifique, valide e ordene chaves do seu JSON',
-    component: FormatterTool,
+    render: (tabId) => <FormatterTool tabId={tabId} />,
   },
   {
     id: 'tree',
     name: 'Árvore',
     icon: '🌲',
     description: 'Navegue pelo JSON em formato de árvore, com busca e cópia de caminhos',
-    component: TreeTool,
+    render: (tabId) => <TreeTool tabId={tabId} />,
   },
   {
     id: 'escape',
     name: 'Escape / Unescape',
     icon: '\\"',
     description: 'Escape e desescape strings JSON, embuta JSON dentro de JSON',
-    component: EscapeTool,
+    render: (tabId) => <EscapeTool tabId={tabId} />,
   },
   {
     id: 'jsonpath',
     name: 'JSONPath',
     icon: '$.',
     description: 'Teste expressões JSONPath com resultados e caminhos em tempo real',
-    component: JsonPathTool,
+    render: (tabId) => <JsonPathTool tabId={tabId} />,
   },
   {
     id: 'jolt',
     name: 'Jolt',
     icon: '⚡',
     description: 'Transforme JSON com specs Jolt — com histórico de execuções persistente',
-    component: JoltTool,
+    render: (tabId) => <JoltTool tabId={tabId} />,
   },
   {
     id: 'diff',
     name: 'Comparar',
     icon: '≠',
     description: 'Compare dois JSONs e veja as diferenças estruturais',
-    component: DiffTool,
+    render: (tabId) => <DiffTool tabId={tabId} />,
   },
 ];
 
@@ -92,7 +93,6 @@ export default function App() {
   );
 
   const active = TOOLS.find((t) => t.id === activeId) ?? TOOLS[0];
-  const ActiveComponent = active.component;
 
   return (
     <ThemeContext.Provider value={themeCtx}>
@@ -132,7 +132,7 @@ export default function App() {
             <p>{active.description}</p>
           </header>
           <div className="tool-body" key={active.id}>
-            <ActiveComponent />
+            <TabbedTool toolId={active.id} render={active.render} />
           </div>
         </main>
       </div>

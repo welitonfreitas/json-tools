@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import TreeView from '../components/TreeView';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson, computeStats, formatBytes } from '../lib/jsonUtils';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE = `{
   "empresa": "Acme",
@@ -13,8 +14,9 @@ const SAMPLE = `{
   "endereco": { "cidade": "São Paulo", "uf": "SP" }
 }`;
 
-export default function TreeTool() {
-  const [text, setText] = usePersistentState('tree:text', SAMPLE);
+export default function TreeTool({ tabId }: { tabId: string }) {
+  const legacy = tabId === DEFAULT_TAB_ID ? loadPersisted('tree:text', SAMPLE) : SAMPLE;
+  const [text, setText] = usePersistentState(`tree:${tabId}:text`, legacy);
   const [search, setSearch] = useState('');
   const [expandSignal, setExpandSignal] = useState({ version: 0, expand: true });
 

@@ -15,6 +15,8 @@ Ferramentas para manipulação de JSON no dia a dia — um app web que roda **10
 
 Editores com syntax highlighting, dobra de código (folding) e realce de erros via CodeMirror 6. Tema escuro/claro persistente. Cada ferramenta tem URL própria (`#/format`, `#/tree`, `#/escape`, `#/jsonpath`, `#/jolt`, `#/diff`).
 
+**Abas por ferramenta**: cada ferramenta suporta múltiplas abas para trabalhar com vários payloads ao mesmo tempo — botão `+` cria, `×` fecha (descartando os dados da aba) e clique duplo renomeia. Cada aba tem entrada, saída e histórico próprios, todos persistidos no `localStorage` (sobrevivem a reload).
+
 ## Motor Jolt
 
 Como não existe implementação JavaScript mantida do Jolt, este projeto inclui um motor próprio em TypeScript (`src/lib/jolt/`), compatível com as operações e sintaxes mais usadas:

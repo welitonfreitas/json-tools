@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import JsonEditor from '../components/JsonEditor';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE_A = `{ "nome": "Ana", "idade": 30, "cidade": "SP", "tags": ["a", "b"] }`;
 const SAMPLE_B = `{ "nome": "Ana", "idade": 31, "pais": "BR", "tags": ["a", "c", "d"] }`;
@@ -42,9 +43,10 @@ const fmt = (v: unknown) => {
   return s !== undefined && s.length > 120 ? s.slice(0, 117) + '…' : s;
 };
 
-export default function DiffTool() {
-  const [textA, setTextA] = usePersistentState('diff:a', '');
-  const [textB, setTextB] = usePersistentState('diff:b', '');
+export default function DiffTool({ tabId }: { tabId: string }) {
+  const isFirst = tabId === DEFAULT_TAB_ID;
+  const [textA, setTextA] = usePersistentState(`diff:${tabId}:a`, isFirst ? loadPersisted('diff:a', '') : '');
+  const [textB, setTextB] = usePersistentState(`diff:${tabId}:b`, isFirst ? loadPersisted('diff:b', '') : '');
 
   const parsedA = useMemo(() => tryParseJson(textA), [textA]);
   const parsedB = useMemo(() => tryParseJson(textB), [textB]);

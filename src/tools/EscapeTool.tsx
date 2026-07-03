@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
-import { usePersistentState } from '../lib/persist';
+import { usePersistentState, loadPersisted } from '../lib/persist';
 import { escapeJsonString, unescapeJsonString, tryParseJson } from '../lib/jsonUtils';
+import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 // JSON embutido como string escapada — funciona com "Desescapar" e "String → JSON"
 const SAMPLE = escapeJsonString(JSON.stringify({ mensagem: 'Olá, "mundo"!\nSegunda linha', ok: true }));
 
-export default function EscapeTool() {
-  const [input, setInput] = usePersistentState('escape:input', '');
-  const [output, setOutput] = useState('');
+export default function EscapeTool({ tabId }: { tabId: string }) {
+  const legacy = tabId === DEFAULT_TAB_ID ? loadPersisted('escape:input', '') : '';
+  const [input, setInput] = usePersistentState(`escape:${tabId}:input`, legacy);
+  const [output, setOutput] = usePersistentState(`escape:${tabId}:output`, '');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
