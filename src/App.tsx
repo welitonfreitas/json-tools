@@ -129,7 +129,7 @@ export default function App() {
         <main className="main">
           <header className="tool-header">
             <h1>{active.name}</h1>
-            <p>{active.description}</p>
+            <p>— {active.description}</p>
           </header>
           <div className="tool-body" key={active.id}>
             <TabbedTool toolId={active.id} render={active.render} />
