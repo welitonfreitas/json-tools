@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
-import { joltTransform, SUPPORTED_OPERATIONS, Json } from '../lib/jolt';
+import { joltTransformSteps, SUPPORTED_OPERATIONS } from '../lib/jolt';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
 
 const SAMPLE_INPUT = `{
@@ -29,6 +29,9 @@ const SAMPLE_SPEC = `[
   {
     "operation": "default",
     "spec": { "Range": 5 }
+  },
+  {
+    "operation": "sort"
   }
 ]`;
 
@@ -38,8 +41,22 @@ export interface JoltHistoryEntry {
   input: string;
   spec: string;
   ok: boolean;
-  /** Saída formatada (se ok) ou mensagem de erro. */
+  /** Saída final formatada (se ok) ou mensagem de erro. */
   result: string;
+}
+
+/** Um passo visualizável: a entrada original ou a saída de uma operação da cadeia. */
+interface RunStep {
+  /** Rótulo curto do chip: "Entrada" ou o nome da operação. */
+  label: string;
+  ok: boolean;
+  /** JSON formatado (se ok) ou mensagem de erro. */
+  text: string;
+}
+
+interface RunState {
+  steps: RunStep[];
+  ts: number;
 }
 
 const MAX_HISTORY = 50;
@@ -53,6 +70,38 @@ function entryTitle(e: JoltHistoryEntry): string {
   return 'spec inválida';
 }
 
+/** Executa a cadeia e monta os passos visualizáveis (Entrada + uma saída por operação). */
+function computeRun(input: string, spec: string): RunState {
+  const ts = Date.now();
+  const inputParsed = tryParseJson(input);
+  if (!inputParsed.ok) {
+    return { ts, steps: [{ label: 'Entrada', ok: false, text: `JSON de entrada inválido: ${inputParsed.error}` }] };
+  }
+  const steps: RunStep[] = [
+    { label: 'Entrada', ok: true, text: JSON.stringify(inputParsed.value, null, 2) },
+  ];
+  const specParsed = tryParseJson(spec);
+  if (!specParsed.ok) {
+    steps.push({ label: 'spec', ok: false, text: `Spec inválida: ${specParsed.error}` });
+    return { ts, steps };
+  }
+  try {
+    for (const s of joltTransformSteps(specParsed.value, inputParsed.value)) {
+      if (s.error !== undefined) {
+        steps.push({ label: s.operation, ok: false, text: s.error });
+      } else {
+        steps.push({ label: s.operation, ok: true, text: JSON.stringify(s.output, null, 2) ?? 'null' });
+      }
+    }
+  } catch (e) {
+    steps.push({ label: 'spec', ok: false, text: e instanceof Error ? e.message : String(e) });
+  }
+  return { ts, steps };
+}
+
+/** Nome curto para o chip: "modify-overwrite-beta" → "modify-overwrite". */
+const shortOp = (label: string) => label.replace(/-beta$/, '');
+
 export default function JoltTool({ tabId }: { tabId: string }) {
   const isFirst = tabId === DEFAULT_TAB_ID;
   const [input, setInput] = usePersistentState(
@@ -63,67 +112,73 @@ export default function JoltTool({ tabId }: { tabId: string }) {
     `jolt:${tabId}:spec`,
     isFirst ? loadPersisted('jolt:spec', SAMPLE_SPEC) : SAMPLE_SPEC,
   );
-  // Histórico por aba: cada payload mantém seu próprio registro de execuções
   const [history, setHistory] = usePersistentState<JoltHistoryEntry[]>(
     `jolt:${tabId}:history`,
     isFirst ? loadPersisted<JoltHistoryEntry[]>('jolt:history', []) : [],
   );
-  // Saída persistida por aba, para comparar resultados alternando entre abas
-  const [output, setOutput] = usePersistentState(`jolt:${tabId}:output`, '');
-  const [error, setError] = usePersistentState<string | null>(`jolt:${tabId}:error`, null);
+  // Última execução (todos os passos), persistida para sobreviver a reloads
+  const [run, setRun] = usePersistentState<RunState | null>(`jolt:${tabId}:run`, null);
+  // Passo selecionado no navegador; null = último (resultado final)
+  const [selected, setSelected] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  const execute = () => {
-    const inputParsed = tryParseJson(input);
-    const specParsed = tryParseJson(spec);
-    let ok = false;
-    let result: string;
+  // Nova execução volta a seleção para o resultado final
+  useEffect(() => {
+    setSelected(null);
+  }, [run?.ts]);
 
-    if (!inputParsed.ok) {
-      result = `JSON de entrada inválido: ${inputParsed.error}`;
-    } else if (!specParsed.ok) {
-      result = `Spec inválida: ${specParsed.error}`;
-    } else {
-      try {
-        const out = joltTransform(specParsed.value as Json, inputParsed.value as Json);
-        result = JSON.stringify(out, null, 2) ?? 'null';
-        ok = true;
-      } catch (e) {
-        result = e instanceof Error ? e.message : String(e);
-      }
+  const runChain = (recordHistory: boolean, inputText = input, specText = spec) => {
+    const newRun = computeRun(inputText, specText);
+    setRun(newRun);
+    if (recordHistory) {
+      const last = newRun.steps[newRun.steps.length - 1];
+      const entry: JoltHistoryEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        ts: newRun.ts,
+        input: inputText,
+        spec: specText,
+        ok: last.ok,
+        result: last.text,
+      };
+      setHistory((h) => [entry, ...h].slice(0, MAX_HISTORY));
     }
-
-    setOutput(ok ? result : '');
-    setError(ok ? null : result);
-    const entry: JoltHistoryEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      ts: Date.now(),
-      input,
-      spec,
-      ok,
-      result,
-    };
-    setHistory((h) => [entry, ...h].slice(0, MAX_HISTORY));
   };
 
   const restore = (e: JoltHistoryEntry) => {
     setInput(e.input);
     setSpec(e.spec);
-    setOutput(e.ok ? e.result : '');
-    setError(e.ok ? null : e.result);
+    // Reexecuta localmente para reconstruir os passos, sem poluir o histórico
+    runChain(false, e.input, e.spec);
   };
+
+  const steps = run?.steps ?? [];
+  const lastIndex = steps.length - 1;
+  const selectedIndex = selected === null ? lastIndex : Math.min(selected, lastIndex);
+  const selectedStep = selectedIndex >= 0 ? steps[selectedIndex] : null;
+  const finalOk = lastIndex >= 0 && steps[lastIndex].ok;
+
+  const stepCaption =
+    selectedStep === null
+      ? ''
+      : selectedIndex === 0
+        ? 'Entrada original'
+        : selectedIndex === lastIndex && selectedStep.ok
+          ? `Resultado final (após ${lastIndex} ${lastIndex === 1 ? 'operação' : 'operações'})`
+          : selectedStep.ok
+            ? `Após a operação #${selectedIndex} (${selectedStep.label})`
+            : `Falha na operação #${selectedIndex} (${selectedStep.label})`;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      execute();
+      runChain(true);
     }
   };
 
   return (
     <div className="tool" onKeyDown={onKeyDown}>
       <div className="toolbar">
-        <button className="btn btn-primary" onClick={execute} title="Executar transformação (Ctrl+Enter)">
+        <button className="btn btn-primary" onClick={() => runChain(true)} title="Executar transformação (Ctrl+Enter)">
           ▶ Executar
         </button>
         <button
@@ -139,7 +194,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
           {showHelp ? 'Ocultar ajuda' : 'Ajuda'}
         </button>
         <span className="toolbar-spacer" />
-        <span className="hint">Ctrl+Enter executa · histórico sobrevive a reloads</span>
+        <span className="hint">Ctrl+Enter executa · clique numa operação para ver o resultado intermediário</span>
       </div>
 
       {showHelp && (
@@ -149,11 +204,8 @@ export default function JoltTool({ tabId }: { tabId: string }) {
             executada 100% no navegador. Operações suportadas: {SUPPORTED_OPERATIONS.map((op) => <code key={op}>{op}</code>)}.
           </p>
           <p>
-            Sintaxe de <code>shift</code>: chaves literais, <code>a|b</code>, <code>*</code>, padrões <code>foo*</code>,{' '}
-            <code>&amp;</code>/<code>&amp;(n)</code>/<code>&amp;(n,k)</code>, <code>$</code>, <code>#literal</code>,{' '}
-            <code>@(n,caminho)</code> e no destino <code>[]</code>, <code>[&amp;n]</code>, <code>[#n]</code>.{' '}
-            Em <code>modify-*-beta</code>: funções como <code>=toInteger</code>, <code>=concat(@(1,a),'-',@(1,b))</code>,{' '}
-            <code>=size</code>, <code>=sum</code>, <code>=join</code>, <code>=split</code> etc.
+            Após executar, use a linha do tempo acima da saída para inspecionar o resultado de cada operação da cadeia —
+            do payload de entrada até o resultado final. A saída de cada operação é a entrada da seguinte.
           </p>
         </div>
       )}
@@ -183,13 +235,46 @@ export default function JoltTool({ tabId }: { tabId: string }) {
           </div>
         </div>
 
-        <div className="split-pane">
+        <div className="split-pane jolt-output">
           <div className="pane-header">
-            <span className="pane-title">Saída</span>
-            <CopyButton small text={() => output} />
+            <span className="pane-title">Saída {stepCaption && <span className="step-caption">· {stepCaption}</span>}</span>
+            {selectedStep?.ok && <CopyButton small text={() => selectedStep.text} />}
           </div>
+          {steps.length > 0 && (
+            <div className="step-bar" role="tablist" aria-label="Passos da transformação">
+              {steps.map((s, i) => (
+                <span key={i} className="step-item">
+                  {i > 0 && <span className="step-arrow">→</span>}
+                  <button
+                    role="tab"
+                    aria-selected={i === selectedIndex}
+                    className={`step-chip ${i === selectedIndex ? 'step-active' : ''} ${s.ok ? '' : 'step-failed'} ${
+                      i === lastIndex && s.ok ? 'step-final' : ''
+                    }`}
+                    onClick={() => setSelected(i === lastIndex ? null : i)}
+                    title={
+                      i === 0
+                        ? 'Payload de entrada'
+                        : s.ok
+                          ? `Resultado após a operação #${i} (${s.label})`
+                          : `Erro na operação #${i} (${s.label})`
+                    }
+                  >
+                    {i === 0 ? s.label : <><span className="step-num">{i}</span>{shortOp(s.label)}</>}
+                    {!s.ok && ' ✗'}
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="editor-fill">
-            {error ? <div className="placeholder placeholder-error jolt-error">✗ {error}</div> : <JsonEditor value={output} readOnly placeholder="Clique em Executar…" />}
+            {selectedStep === null ? (
+              <div className="placeholder">Clique em ▶ Executar para rodar a cadeia e navegar pelos resultados de cada operação.</div>
+            ) : selectedStep.ok ? (
+              <JsonEditor value={selectedStep.text} readOnly />
+            ) : (
+              <div className="placeholder placeholder-error jolt-error">✗ {selectedStep.text}</div>
+            )}
           </div>
         </div>
 
@@ -217,7 +302,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
                       </span>
                     </div>
                     <div className="history-actions">
-                      <button className="btn btn-small" onClick={() => restore(e)} title="Restaurar entrada, spec e resultado desta execução">
+                      <button className="btn btn-small" onClick={() => restore(e)} title="Restaurar entrada e spec e reexecutar os passos desta execução">
                         Restaurar
                       </button>
                       {e.ok && <CopyButton small label="Copiar saída" text={e.result} />}
@@ -236,6 +321,19 @@ export default function JoltTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
+      </div>
+
+      <div className={`statusbar ${steps.length === 0 ? '' : finalOk ? 'status-ok' : 'status-error'}`}>
+        {steps.length === 0 ? (
+          <span>Nenhuma execução ainda nesta aba</span>
+        ) : finalOk ? (
+          <>
+            <span>✓ Cadeia executada: {lastIndex} {lastIndex === 1 ? 'operação' : 'operações'}</span>
+            <span>{new Date(run!.ts).toLocaleString('pt-BR')}</span>
+          </>
+        ) : (
+          <span>✗ Execução falhou no passo marcado com ✗ — os passos anteriores continuam navegáveis</span>
+        )}
       </div>
     </div>
   );
