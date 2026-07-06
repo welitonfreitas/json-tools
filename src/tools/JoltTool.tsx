@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState, loadPersisted } from '../lib/persist';
@@ -192,6 +192,14 @@ export default function JoltTool({ tabId }: { tabId: string }) {
 
   const visible = (pane: 'input' | 'spec' | 'output' | 'history') => maximized === null || maximized === pane;
 
+  const inputValid = useMemo(() => tryParseJson(input).ok, [input]);
+  const specValid = useMemo(() => tryParseJson(spec).ok, [spec]);
+
+  const format = (text: string, set: (v: string) => void) => {
+    const p = tryParseJson(text);
+    if (p.ok) set(JSON.stringify(p.value, null, 2));
+  };
+
   return (
     <div className="tool" onKeyDown={onKeyDown}>
       <div className="toolbar">
@@ -232,6 +240,14 @@ export default function JoltTool({ tabId }: { tabId: string }) {
           <div className="split-pane">
             <div className="pane-header">
               <span className="pane-title">Entrada</span>
+              <button
+                className="btn btn-small"
+                onClick={() => format(input, setInput)}
+                disabled={!inputValid}
+                title={inputValid ? 'Formatar JSON (2 espaços)' : 'JSON inválido — corrija antes de formatar'}
+              >
+                Formatar
+              </button>
               <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
                 Limpar
               </button>
@@ -247,6 +263,14 @@ export default function JoltTool({ tabId }: { tabId: string }) {
           <div className="split-pane">
             <div className="pane-header">
               <span className="pane-title">Spec (cadeia de operações)</span>
+              <button
+                className="btn btn-small"
+                onClick={() => format(spec, setSpec)}
+                disabled={!specValid}
+                title={specValid ? 'Formatar JSON (2 espaços)' : 'JSON inválido — corrija antes de formatar'}
+              >
+                Formatar
+              </button>
               <button className="btn btn-small btn-danger-ghost" onClick={() => setSpec('')} disabled={spec === ''}>
                 Limpar
               </button>
