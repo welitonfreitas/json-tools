@@ -179,7 +179,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      runChain(true);
+      if (tryParseJson(input).ok && tryParseJson(spec).ok) runChain(true);
     }
     if (e.key === 'Escape' && maximized !== null) {
       setMaximized(null);
@@ -198,8 +198,22 @@ export default function JoltTool({ tabId }: { tabId: string }) {
 
   const visible = (pane: 'input' | 'spec' | 'output' | 'history') => maximized === null || maximized === pane;
 
-  const inputValid = useMemo(() => tryParseJson(input).ok, [input]);
-  const specValid = useMemo(() => tryParseJson(spec).ok, [spec]);
+  const inputParse = useMemo(() => tryParseJson(input), [input]);
+  const specParse = useMemo(() => tryParseJson(spec), [spec]);
+  const inputValid = inputParse.ok;
+  const specValid = specParse.ok;
+  const canRun = inputValid && specValid;
+
+  /** Selo de erro para o cabeçalho do painel (com linha/coluna quando disponível). */
+  const invalidBadge = (parse: typeof inputParse, text: string) => {
+    if (parse.ok || text.trim() === '') return null;
+    const where = parse.line !== undefined ? ` — linha ${parse.line}${parse.column !== undefined ? `, col ${parse.column}` : ''}` : '';
+    return (
+      <span className="pane-error-badge" title={parse.error}>
+        ✗ JSON inválido{where}
+      </span>
+    );
+  };
 
   const format = (text: string, set: (v: string) => void) => {
     const p = tryParseJson(text);
@@ -251,7 +265,20 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   return (
     <div className="tool" onKeyDown={onKeyDown}>
       <div className="toolbar">
-        <button className="btn btn-primary" onClick={() => runChain(true)} title="Executar transformação (Ctrl+Enter)">
+        <button
+          className="btn btn-primary"
+          onClick={() => runChain(true)}
+          disabled={!canRun}
+          title={
+            canRun
+              ? 'Executar transformação (Ctrl+Enter)'
+              : !inputValid && !specValid
+                ? 'Entrada e spec inválidas — corrija os JSONs para executar'
+                : !inputValid
+                  ? 'JSON de entrada inválido — corrija para executar'
+                  : 'Spec inválida — corrija o JSON para executar'
+          }
+        >
           ▶ Executar
         </button>
         <button
@@ -321,9 +348,10 @@ export default function JoltTool({ tabId }: { tabId: string }) {
 
       <div className={`jolt-grid ${layout === 'columns' ? 'jolt-cols' : ''} ${maximized !== null ? 'jolt-grid-max' : ''}`}>
         {visible('input') && (
-          <div className="split-pane">
+          <div className={`split-pane ${!inputValid && input.trim() !== '' ? 'pane-invalid' : ''}`}>
             <div className="pane-header">
               <span className="pane-title">Entrada</span>
+              {invalidBadge(inputParse, input)}
               <button
                 className="btn btn-small"
                 onClick={() => format(input, setInput)}
@@ -344,9 +372,10 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         )}
 
         {visible('spec') && (
-          <div className="split-pane">
+          <div className={`split-pane ${!specValid && spec.trim() !== '' ? 'pane-invalid' : ''}`}>
             <div className="pane-header">
               <span className="pane-title">Spec (cadeia de operações)</span>
+              {invalidBadge(specParse, spec)}
               <button
                 className="btn btn-small"
                 onClick={() => format(spec, setSpec)}
