@@ -99,6 +99,30 @@ describe('integração: spec real de sinistro (13 operações)', () => {
     });
   });
 
+  it('item sem reservas (pós-filtro) gera dsValorOrigem "." e filtro ";<cobertura>"', () => {
+    // Estado após filtrar todas as reservas de um item: mantém CIRModality, sem ClaimReserveList
+    const inputComItemVazio = JSON.parse(JSON.stringify(input)) as {
+      request: {
+        body: { claimCaseDetail: { ClaimCase: { ClaimObjectList: { ClaimItemList: unknown[] }[] } } };
+      };
+    };
+    inputComItemVazio.request.body.claimCaseDetail.ClaimCase.ClaimObjectList[0].ClaimItemList.push({
+      CIRModality: '178I',
+    });
+
+    const out = joltTransform(spec, inputComItemVazio) as { body: Record<string, unknown>[] };
+    expect(out.body).toHaveLength(3);
+    expect(out.body[0].dsValorOrigem).toBe('95000.00');
+    expect(out.body[1].dsValorOrigem).toBe('95000.00');
+    expect(out.body[2]).toEqual({
+      dsValorOrigem: '.',
+      cdDocumentoAuditoria: ';178I',
+      cdIdentificadorDestino: 'cir_num_sinistro;cir_cobertura',
+      dsIdentificadorDestino: 'sql...',
+      cdChaveIntegracao: 'chave-123',
+    });
+  });
+
   it('todas as operações intermediárias executam sem erro', () => {
     const steps = joltTransformSteps(spec, input);
     expect(steps).toHaveLength(13);

@@ -211,16 +211,70 @@ describe('modify: casos avançados', () => {
     expect(joltTransform(spec, input)).toEqual({ partes: ['95000', ''], alvo: '00', primeiro: '95000' });
   });
 
-  it('encadeia split, rightPad e substring para formatar decimais', () => {
+  it('split segue a semântica do Java: descarta strings vazias no final', () => {
+    const input = { a: '.', b: '95000.0.', c: 'x.y', d: '..meio..' };
+    const spec = [
+      {
+        operation: 'modify-overwrite-beta',
+        spec: {
+          a: "=split('\\.', @(1,&))",
+          b: "=split('\\.', @(1,&))",
+          c: "=split('\\.', @(1,&))",
+          d: "=split('\\.', @(1,&))",
+        },
+      },
+    ];
+    expect(joltTransform(spec, input)).toEqual({
+      a: [],
+      b: ['95000', '0'],
+      c: ['x', 'y'],
+      d: ['', '', 'meio'],
+    });
+  });
+
+  it('funções double concatenam como Double do Java (95000 → "95000.0")', () => {
     const input = { valor: 95000 };
     const spec = [
-      { operation: 'modify-overwrite-beta', spec: { temp: "=concat(@(1,valor), '.')" } },
+      {
+        operation: 'modify-overwrite-beta',
+        spec: { media: '=divideAndRound(2,@(1,valor),1)', texto: "=concat(@(1,media), '.')" },
+      },
+    ];
+    // O valor persiste como número puro; a concatenação dentro da operação vê "95000.0"
+    expect(joltTransform(spec, input)).toEqual({ valor: 95000, media: 95000, texto: '95000.0.' });
+  });
+
+  it('encadeia divideAndRound, split, rightPad e substring para formatar decimais', () => {
+    const input = { valor: 95000 };
+    const spec = [
+      {
+        operation: 'modify-overwrite-beta',
+        spec: { ds: '=divideAndRound(2, @(1,valor), 1)', temp: "=concat(@(1,ds), '.')" },
+      },
       { operation: 'modify-overwrite-beta', spec: { partes: "=split('\\.', @(1,temp))" } },
       { operation: 'modify-overwrite-beta', spec: { pad: "=rightPad(@(1,partes[1]), 2, '0')" } },
       { operation: 'modify-overwrite-beta', spec: { final: "=concat(@(1,partes[0]), '.', @(1,pad))" } },
-      { operation: 'remove', spec: { temp: '', partes: '', pad: '' } },
+      { operation: 'remove', spec: { temp: '', partes: '', pad: '', ds: '' } },
     ];
     expect(joltTransform(spec, input)).toEqual({ valor: 95000, final: '95000.00' });
+  });
+
+  it('valor ausente atravessa a cadeia de formatação virando "." (não ".00")', () => {
+    const input = { outro: 1 };
+    const spec = [
+      {
+        operation: 'modify-overwrite-beta',
+        spec: { ds: '=divideAndRound(2, @(1,ausente), 1)', temp: "=concat(@(1,ds), '.')" },
+      },
+      { operation: 'modify-overwrite-beta', spec: { partes: "=split('\\.', @(1,temp))" } },
+      { operation: 'modify-overwrite-beta', spec: { pad: "=rightPad(@(1,partes[1]), 2, '0')" } },
+      {
+        operation: 'modify-overwrite-beta',
+        spec: { fin: '=substring(@(1,pad), 0, 2)', ds: "=concat(@(1,partes[0]), '.', @(1,fin))" },
+      },
+      { operation: 'remove', spec: { temp: '', partes: '', pad: '', fin: '' } },
+    ];
+    expect(joltTransform(spec, input)).toEqual({ outro: 1, ds: '.' });
   });
 
   it('modify posterior enxerga escritas de chaves anteriores da mesma operação', () => {
