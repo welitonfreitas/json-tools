@@ -52,35 +52,44 @@ export function resolveAmp(token: string, walked: WalkLevel[]): string {
   });
 }
 
-/** Navega `path` (notação com pontos) a partir de `value`. */
+/** Navega `path` (notação com pontos e colchetes, ex.: `a.b[0].c`) a partir de `value`. */
 export function lookupPath(value: Json | undefined, path: string): Json | undefined {
   if (path === '') return value;
   let cur: Json | undefined = value;
-  for (const seg of path.split('.')) {
-    if (cur === null || cur === undefined) return undefined;
-    if (Array.isArray(cur)) {
-      const i = parseInt(seg, 10);
-      cur = Number.isNaN(i) ? undefined : cur[i];
-    } else if (typeof cur === 'object') {
-      cur = (cur as Record<string, Json>)[seg];
-    } else {
-      return undefined;
+  for (const rawSeg of path.split('.')) {
+    const m = rawSeg.match(/^([^[\]]*)((?:\[\d+\])*)$/);
+    if (!m) return undefined;
+    const parts: string[] = [];
+    if (m[1] !== '') parts.push(m[1]);
+    if (m[2]) for (const bm of m[2].matchAll(/\[(\d+)\]/g)) parts.push(bm[1]);
+    for (const seg of parts) {
+      if (cur === null || cur === undefined) return undefined;
+      if (Array.isArray(cur)) {
+        const i = parseInt(seg, 10);
+        cur = Number.isNaN(i) ? undefined : cur[i];
+      } else if (typeof cur === 'object') {
+        cur = (cur as Record<string, Json>)[seg];
+      } else {
+        return undefined;
+      }
     }
   }
   return cur;
 }
 
-/** Resolve um token `@`, `@(n)`, `@(n,path)` ou `@path` contra a pilha. */
+/** Resolve um token `@`, `@(n)`, `@(n,path)` ou `@path` contra a pilha.
+ *  O caminho pode conter referências `&` (resolvidas para as chaves visitadas). */
 export function resolveAt(token: string, walked: WalkLevel[]): Json | undefined {
   if (token === '@') return levelUp(walked, 0).value;
+  const resolvePath = (p: string): string => (p.includes('&') ? resolveAmp(p, walked) : p);
   const paren = token.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
   if (paren) {
     const level = levelUp(walked, parseInt(paren[1], 10));
-    return lookupPath(level.value, paren[2] ?? '');
+    return lookupPath(level.value, resolvePath(paren[2] ?? ''));
   }
   // Forma abreviada @foo.bar → nível 0
   const short = token.match(/^@(.+)$/);
-  if (short) return lookupPath(levelUp(walked, 0).value, short[1]);
+  if (short) return lookupPath(levelUp(walked, 0).value, resolvePath(short[1]));
   return undefined;
 }
 

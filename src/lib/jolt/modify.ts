@@ -13,6 +13,17 @@ function levelValue(walked: ModifyLevel[], n: number): Json | undefined {
   return walked[idx].value;
 }
 
+/** Resolve referências `&`, `&n`, `&(n)` num caminho de modify (n=0 → chave atual). */
+function resolveAmpInPath(path: string, walked: ModifyLevel[]): string {
+  if (!path.includes('&')) return path;
+  return path.replace(/&(?:\((\d+)\)|(\d+))?/g, (_m, pN, bareN) => {
+    const n = pN !== undefined ? parseInt(pN, 10) : bareN !== undefined ? parseInt(bareN, 10) : 0;
+    const idx = walked.length - 1 - n;
+    if (idx < 0) throw new JoltError(`Referência &(${n}) aponta acima da raiz`);
+    return walked[idx].key;
+  });
+}
+
 /** Divide argumentos por vírgula no nível 0 (respeitando parênteses e aspas simples). */
 function splitArgs(s: string): string[] {
   const out: string[] = [];
@@ -48,8 +59,12 @@ function splitArgs(s: string): string[] {
 function parseArg(arg: string, walked: ModifyLevel[]): Json | undefined {
   if (arg.startsWith('@')) {
     const m = arg.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
-    if (m) return lookupPath(levelValue(walked, parseInt(m[1], 10)), m[2] ?? '') as Json | undefined;
-    return lookupPath(levelValue(walked, 0), arg.slice(1)) as Json | undefined;
+    if (m) {
+      return lookupPath(levelValue(walked, parseInt(m[1], 10)), resolveAmpInPath(m[2] ?? '', walked)) as
+        | Json
+        | undefined;
+    }
+    return lookupPath(levelValue(walked, 0), resolveAmpInPath(arg.slice(1), walked)) as Json | undefined;
   }
   if (arg.startsWith("'") && arg.endsWith("'")) return arg.slice(1, -1);
   if (arg === 'true') return true;
@@ -229,8 +244,12 @@ function evalRhs(rhs: Json, current: Json | undefined, walked: ModifyLevel[]): J
   }
   if (rhs.startsWith('@')) {
     const m = rhs.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
-    if (m) return lookupPath(levelValue(walked, parseInt(m[1], 10)), m[2] ?? '') as Json | undefined;
-    return lookupPath(levelValue(walked, 0), rhs.slice(1)) as Json | undefined;
+    if (m) {
+      return lookupPath(levelValue(walked, parseInt(m[1], 10)), resolveAmpInPath(m[2] ?? '', walked)) as
+        | Json
+        | undefined;
+    }
+    return lookupPath(levelValue(walked, 0), resolveAmpInPath(rhs.slice(1), walked)) as Json | undefined;
   }
   return rhs;
 }
@@ -263,8 +282,18 @@ function modifyWalk(spec: Record<string, Json>, target: Json, walked: ModifyLeve
       };
 
       if (isPlainObject(specVal)) {
-        if (cur !== null && typeof cur === 'object') {
-          modifyWalk(specVal, cur, [...walked, { key, value: cur }], overwrite);
+        let container = cur;
+        if (container === undefined || container === null) {
+          // Chaves literais com spec aninhada criam o contêiner ausente (como no Jolt)
+          const isLiteral = specKey !== '*' && !specKey.includes('*') && !specKey.includes('|');
+          if (!isLiteral) continue;
+          const specKeys = Object.keys(specVal);
+          const allNumeric = specKeys.length > 0 && specKeys.every((k) => /^\d+$/.test(k));
+          container = allNumeric ? [] : {};
+          set(container);
+        }
+        if (container !== null && typeof container === 'object') {
+          modifyWalk(specVal, container, [...walked, { key, value: container }], overwrite);
         }
       } else {
         if (!overwrite && cur !== undefined && cur !== null) continue;
