@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { joltTransformSteps, SUPPORTED_OPERATIONS } from '../lib/jolt';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
+import DiffView from '../components/DiffView';
 
 const SAMPLE_INPUT = `{
   "rating": {
@@ -121,6 +122,13 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   // Passo selecionado no navegador; null = último (resultado final)
   const [selected, setSelected] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Painel maximizado em tela cheia dentro da ferramenta (Esc restaura)
+  const [maximized, setMaximized] = useState<'input' | 'spec' | 'output' | 'history' | null>(null);
+  // Modo de visualização do passo: JSON completo ou diff em relação ao passo anterior
+  const [viewMode, setViewMode] = useState<'json' | 'diff'>('json');
+  // Layout: 3 colunas (Entrada | Spec | Saída, histórico na barra) ou grade 2×2
+  const [layout, setLayout] = usePersistentState<'columns' | 'grid'>('jolt:layout', 'columns');
+  const [showHistory, setShowHistory] = useState(false);
 
   // Nova execução volta a seleção para o resultado final
   useEffect(() => {
@@ -171,14 +179,106 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      runChain(true);
+      if (tryParseJson(input).ok && tryParseJson(spec).ok) runChain(true);
+    }
+    if (e.key === 'Escape' && maximized !== null) {
+      setMaximized(null);
     }
   };
+
+  const maxButton = (pane: 'input' | 'spec' | 'output' | 'history') => (
+    <button
+      className="btn btn-small btn-max"
+      onClick={() => setMaximized(maximized === pane ? null : pane)}
+      title={maximized === pane ? 'Restaurar layout (Esc)' : 'Maximizar este painel'}
+    >
+      {maximized === pane ? '🗗 Restaurar' : '⛶'}
+    </button>
+  );
+
+  const visible = (pane: 'input' | 'spec' | 'output' | 'history') => maximized === null || maximized === pane;
+
+  const inputParse = useMemo(() => tryParseJson(input), [input]);
+  const specParse = useMemo(() => tryParseJson(spec), [spec]);
+  const inputValid = inputParse.ok;
+  const specValid = specParse.ok;
+  const canRun = inputValid && specValid;
+
+  /** Selo de erro para o cabeçalho do painel (com linha/coluna quando disponível). */
+  const invalidBadge = (parse: typeof inputParse, text: string) => {
+    if (parse.ok || text.trim() === '') return null;
+    const where = parse.line !== undefined ? ` — linha ${parse.line}${parse.column !== undefined ? `, col ${parse.column}` : ''}` : '';
+    return (
+      <span className="pane-error-badge" title={parse.error}>
+        ✗ JSON inválido{where}
+      </span>
+    );
+  };
+
+  const format = (text: string, set: (v: string) => void) => {
+    const p = tryParseJson(text);
+    if (p.ok) set(JSON.stringify(p.value, null, 2));
+  };
+
+  const historyList =
+    history.length === 0 ? (
+      <div className="placeholder">As execuções ficam registradas aqui e sobrevivem a reloads da página.</div>
+    ) : (
+      <div className="history-list">
+        {history.map((e) => (
+          <div key={e.id} className={`history-item ${e.ok ? '' : 'history-failed'}`}>
+            <div className="history-head">
+              <span className={`history-status ${e.ok ? 'ok' : 'fail'}`}>{e.ok ? '✓' : '✗'}</span>
+              <span className="history-title" title={entryTitle(e)}>
+                {entryTitle(e)}
+              </span>
+              <span className="history-time">
+                {new Date(e.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+            <div className="history-actions">
+              <button
+                className="btn btn-small"
+                onClick={() => {
+                  restore(e);
+                  setShowHistory(false);
+                }}
+                title="Restaurar entrada e spec e reexecutar os passos desta execução"
+              >
+                Restaurar
+              </button>
+              {e.ok && <CopyButton small label="Copiar saída" text={e.result} />}
+              <button
+                className="btn btn-small btn-danger-ghost"
+                onClick={() => setHistory((h) => h.filter((x) => x.id !== e.id))}
+                title="Remover do histórico"
+              >
+                ✕
+              </button>
+            </div>
+            {!e.ok && <div className="history-error">{e.result}</div>}
+          </div>
+        ))}
+      </div>
+    );
 
   return (
     <div className="tool" onKeyDown={onKeyDown}>
       <div className="toolbar">
-        <button className="btn btn-primary" onClick={() => runChain(true)} title="Executar transformação (Ctrl+Enter)">
+        <button
+          className="btn btn-primary"
+          onClick={() => runChain(true)}
+          disabled={!canRun}
+          title={
+            canRun
+              ? 'Executar transformação (Ctrl+Enter)'
+              : !inputValid && !specValid
+                ? 'Entrada e spec inválidas — corrija os JSONs para executar'
+                : !inputValid
+                  ? 'JSON de entrada inválido — corrija para executar'
+                  : 'Spec inválida — corrija o JSON para executar'
+          }
+        >
           ▶ Executar
         </button>
         <button
@@ -193,7 +293,43 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         <button className="btn" onClick={() => setShowHelp(!showHelp)}>
           {showHelp ? 'Ocultar ajuda' : 'Ajuda'}
         </button>
+        {layout === 'columns' && (
+          <span className="dropdown">
+            <button
+              className={`btn history-toggle ${showHistory ? 'btn-success' : ''}`}
+              onClick={() => setShowHistory(!showHistory)}
+              title="Histórico de execuções desta aba"
+            >
+              🕒 Histórico ({history.length})
+            </button>
+            {showHistory && (
+              <>
+                <div className="popover-backdrop" onClick={() => setShowHistory(false)} />
+                <div className="history-popover">
+                  <div className="popover-header">
+                    <span className="pane-title">Histórico ({history.length})</span>
+                    <button
+                      className="btn btn-small btn-danger-ghost"
+                      onClick={() => setHistory([])}
+                      disabled={history.length === 0}
+                    >
+                      Limpar histórico
+                    </button>
+                  </div>
+                  <div className="popover-body">{historyList}</div>
+                </div>
+              </>
+            )}
+          </span>
+        )}
         <span className="toolbar-spacer" />
+        <button
+          className="btn btn-small"
+          onClick={() => setLayout(layout === 'columns' ? 'grid' : 'columns')}
+          title={layout === 'columns' ? 'Mudar para grade 2×2 (histórico como painel)' : 'Mudar para 3 colunas (histórico na barra)'}
+        >
+          {layout === 'columns' ? '⊞ Grade' : '⫴ Colunas'}
+        </button>
         <span className="hint">Ctrl+Enter executa · clique numa operação para ver o resultado intermediário</span>
       </div>
 
@@ -210,35 +346,79 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         </div>
       )}
 
-      <div className="jolt-grid">
-        <div className="split-pane">
-          <div className="pane-header">
-            <span className="pane-title">Entrada</span>
-            <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
-              Limpar
-            </button>
+      <div className={`jolt-grid ${layout === 'columns' ? 'jolt-cols' : ''} ${maximized !== null ? 'jolt-grid-max' : ''}`}>
+        {visible('input') && (
+          <div className={`split-pane ${!inputValid && input.trim() !== '' ? 'pane-invalid' : ''}`}>
+            <div className="pane-header">
+              <span className="pane-title">Entrada</span>
+              {invalidBadge(inputParse, input)}
+              <button
+                className="btn btn-small"
+                onClick={() => format(input, setInput)}
+                disabled={!inputValid}
+                title={inputValid ? 'Formatar JSON (2 espaços)' : 'JSON inválido — corrija antes de formatar'}
+              >
+                Formatar
+              </button>
+              <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
+                Limpar
+              </button>
+              {maxButton('input')}
+            </div>
+            <div className="editor-fill">
+              <JsonEditor value={input} onChange={setInput} placeholder="JSON de entrada…" />
+            </div>
           </div>
-          <div className="editor-fill">
-            <JsonEditor value={input} onChange={setInput} placeholder="JSON de entrada…" />
-          </div>
-        </div>
+        )}
 
-        <div className="split-pane">
-          <div className="pane-header">
-            <span className="pane-title">Spec (cadeia de operações)</span>
-            <button className="btn btn-small btn-danger-ghost" onClick={() => setSpec('')} disabled={spec === ''}>
-              Limpar
-            </button>
+        {visible('spec') && (
+          <div className={`split-pane ${!specValid && spec.trim() !== '' ? 'pane-invalid' : ''}`}>
+            <div className="pane-header">
+              <span className="pane-title">Spec (cadeia de operações)</span>
+              {invalidBadge(specParse, spec)}
+              <button
+                className="btn btn-small"
+                onClick={() => format(spec, setSpec)}
+                disabled={!specValid}
+                title={specValid ? 'Formatar JSON (2 espaços)' : 'JSON inválido — corrija antes de formatar'}
+              >
+                Formatar
+              </button>
+              <button className="btn btn-small btn-danger-ghost" onClick={() => setSpec('')} disabled={spec === ''}>
+                Limpar
+              </button>
+              {maxButton('spec')}
+            </div>
+            <div className="editor-fill">
+              <JsonEditor value={spec} onChange={setSpec} placeholder='[{"operation": "shift", "spec": {…}}]' />
+            </div>
           </div>
-          <div className="editor-fill">
-            <JsonEditor value={spec} onChange={setSpec} placeholder='[{"operation": "shift", "spec": {…}}]' />
-          </div>
-        </div>
+        )}
 
+        {visible('output') && (
         <div className="split-pane jolt-output">
           <div className="pane-header">
             <span className="pane-title">Saída {stepCaption && <span className="step-caption">· {stepCaption}</span>}</span>
+            {steps.length > 0 && (
+              <span className="seg-toggle" role="group" aria-label="Modo de visualização">
+                <button
+                  className={`seg-option ${viewMode === 'json' ? 'seg-active' : ''}`}
+                  onClick={() => setViewMode('json')}
+                  title="Ver o payload completo do passo selecionado"
+                >
+                  JSON
+                </button>
+                <button
+                  className={`seg-option ${viewMode === 'diff' ? 'seg-active' : ''}`}
+                  onClick={() => setViewMode('diff')}
+                  title="Ver somente o que a operação selecionada mudou (antes × depois)"
+                >
+                  Diff
+                </button>
+              </span>
+            )}
             {selectedStep?.ok && <CopyButton small text={() => selectedStep.text} />}
+            {maxButton('output')}
           </div>
           {steps.length > 0 && (
             <div className="step-bar" role="tablist" aria-label="Passos da transformação">
@@ -267,60 +447,45 @@ export default function JoltTool({ tabId }: { tabId: string }) {
               ))}
             </div>
           )}
-          <div className="editor-fill">
+          <div className={viewMode === 'diff' && selectedStep !== null ? 'pane-body' : 'editor-fill'}>
             {selectedStep === null ? (
               <div className="placeholder">Clique em ▶ Executar para rodar a cadeia e navegar pelos resultados de cada operação.</div>
-            ) : selectedStep.ok ? (
-              <JsonEditor value={selectedStep.text} readOnly />
-            ) : (
+            ) : !selectedStep.ok ? (
               <div className="placeholder placeholder-error jolt-error">✗ {selectedStep.text}</div>
+            ) : viewMode === 'json' ? (
+              <JsonEditor value={selectedStep.text} readOnly />
+            ) : selectedIndex === 0 ? (
+              <div className="placeholder">
+                A Entrada é o ponto de partida — não há passo anterior para comparar. Selecione uma operação para ver o
+                que ela mudou.
+              </div>
+            ) : !steps[selectedIndex - 1].ok ? (
+              <div className="placeholder placeholder-error">O passo anterior falhou — não há payload para comparar.</div>
+            ) : (
+              <DiffView
+                a={JSON.parse(steps[selectedIndex - 1].text)}
+                b={JSON.parse(selectedStep.text)}
+                labelA={selectedIndex === 1 ? 'Entrada' : `Após #${selectedIndex - 1} (${steps[selectedIndex - 1].label})`}
+                labelB={`Após #${selectedIndex} (${selectedStep.label})`}
+                emptyMessage={`A operação #${selectedIndex} (${selectedStep.label}) não alterou a estrutura do payload.`}
+              />
             )}
           </div>
         </div>
+        )}
 
+        {layout === 'grid' && visible('history') && (
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">Histórico ({history.length})</span>
             <button className="btn btn-small btn-danger-ghost" onClick={() => setHistory([])} disabled={history.length === 0}>
               Limpar histórico
             </button>
+            {maxButton('history')}
           </div>
-          <div className="pane-body">
-            {history.length === 0 ? (
-              <div className="placeholder">As execuções ficam registradas aqui e sobrevivem a reloads da página.</div>
-            ) : (
-              <div className="history-list">
-                {history.map((e) => (
-                  <div key={e.id} className={`history-item ${e.ok ? '' : 'history-failed'}`}>
-                    <div className="history-head">
-                      <span className={`history-status ${e.ok ? 'ok' : 'fail'}`}>{e.ok ? '✓' : '✗'}</span>
-                      <span className="history-title" title={entryTitle(e)}>
-                        {entryTitle(e)}
-                      </span>
-                      <span className="history-time">
-                        {new Date(e.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                    </div>
-                    <div className="history-actions">
-                      <button className="btn btn-small" onClick={() => restore(e)} title="Restaurar entrada e spec e reexecutar os passos desta execução">
-                        Restaurar
-                      </button>
-                      {e.ok && <CopyButton small label="Copiar saída" text={e.result} />}
-                      <button
-                        className="btn btn-small btn-danger-ghost"
-                        onClick={() => setHistory((h) => h.filter((x) => x.id !== e.id))}
-                        title="Remover do histórico"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    {!e.ok && <div className="history-error">{e.result}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="pane-body">{historyList}</div>
         </div>
+        )}
       </div>
 
       <div className={`statusbar ${steps.length === 0 ? '' : finalOk ? 'status-ok' : 'status-error'}`}>
