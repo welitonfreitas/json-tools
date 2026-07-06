@@ -790,9 +790,62 @@ mark {
   padding: 2px 2px 0;
 }
 
-.jolt-grid-max {
+.jolt-cols {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr;
+}
+
+.jolt-grid-max,
+.jolt-cols.jolt-grid-max {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+}
+
+/* ---------- dropdown de histórico (layout em colunas) ---------- */
+
+.dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.history-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: min(480px, 80vw);
+  max-height: min(60vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.popover-header .pane-title {
+  flex: 1;
+}
+
+.popover-body {
+  overflow-y: auto;
+  padding: 10px 12px;
 }
 
 .btn-max {

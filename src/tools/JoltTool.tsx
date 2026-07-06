@@ -126,6 +126,9 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   const [maximized, setMaximized] = useState<'input' | 'spec' | 'output' | 'history' | null>(null);
   // Modo de visualização do passo: JSON completo ou diff em relação ao passo anterior
   const [viewMode, setViewMode] = useState<'json' | 'diff'>('json');
+  // Layout: 3 colunas (Entrada | Spec | Saída, histórico na barra) ou grade 2×2
+  const [layout, setLayout] = usePersistentState<'columns' | 'grid'>('jolt:layout', 'columns');
+  const [showHistory, setShowHistory] = useState(false);
 
   // Nova execução volta a seleção para o resultado final
   useEffect(() => {
@@ -203,6 +206,48 @@ export default function JoltTool({ tabId }: { tabId: string }) {
     if (p.ok) set(JSON.stringify(p.value, null, 2));
   };
 
+  const historyList =
+    history.length === 0 ? (
+      <div className="placeholder">As execuções ficam registradas aqui e sobrevivem a reloads da página.</div>
+    ) : (
+      <div className="history-list">
+        {history.map((e) => (
+          <div key={e.id} className={`history-item ${e.ok ? '' : 'history-failed'}`}>
+            <div className="history-head">
+              <span className={`history-status ${e.ok ? 'ok' : 'fail'}`}>{e.ok ? '✓' : '✗'}</span>
+              <span className="history-title" title={entryTitle(e)}>
+                {entryTitle(e)}
+              </span>
+              <span className="history-time">
+                {new Date(e.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+            <div className="history-actions">
+              <button
+                className="btn btn-small"
+                onClick={() => {
+                  restore(e);
+                  setShowHistory(false);
+                }}
+                title="Restaurar entrada e spec e reexecutar os passos desta execução"
+              >
+                Restaurar
+              </button>
+              {e.ok && <CopyButton small label="Copiar saída" text={e.result} />}
+              <button
+                className="btn btn-small btn-danger-ghost"
+                onClick={() => setHistory((h) => h.filter((x) => x.id !== e.id))}
+                title="Remover do histórico"
+              >
+                ✕
+              </button>
+            </div>
+            {!e.ok && <div className="history-error">{e.result}</div>}
+          </div>
+        ))}
+      </div>
+    );
+
   return (
     <div className="tool" onKeyDown={onKeyDown}>
       <div className="toolbar">
@@ -221,7 +266,43 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         <button className="btn" onClick={() => setShowHelp(!showHelp)}>
           {showHelp ? 'Ocultar ajuda' : 'Ajuda'}
         </button>
+        {layout === 'columns' && (
+          <span className="dropdown">
+            <button
+              className={`btn history-toggle ${showHistory ? 'btn-success' : ''}`}
+              onClick={() => setShowHistory(!showHistory)}
+              title="Histórico de execuções desta aba"
+            >
+              🕒 Histórico ({history.length})
+            </button>
+            {showHistory && (
+              <>
+                <div className="popover-backdrop" onClick={() => setShowHistory(false)} />
+                <div className="history-popover">
+                  <div className="popover-header">
+                    <span className="pane-title">Histórico ({history.length})</span>
+                    <button
+                      className="btn btn-small btn-danger-ghost"
+                      onClick={() => setHistory([])}
+                      disabled={history.length === 0}
+                    >
+                      Limpar histórico
+                    </button>
+                  </div>
+                  <div className="popover-body">{historyList}</div>
+                </div>
+              </>
+            )}
+          </span>
+        )}
         <span className="toolbar-spacer" />
+        <button
+          className="btn btn-small"
+          onClick={() => setLayout(layout === 'columns' ? 'grid' : 'columns')}
+          title={layout === 'columns' ? 'Mudar para grade 2×2 (histórico como painel)' : 'Mudar para 3 colunas (histórico na barra)'}
+        >
+          {layout === 'columns' ? '⊞ Grade' : '⫴ Colunas'}
+        </button>
         <span className="hint">Ctrl+Enter executa · clique numa operação para ver o resultado intermediário</span>
       </div>
 
@@ -238,7 +319,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         </div>
       )}
 
-      <div className={`jolt-grid ${maximized !== null ? 'jolt-grid-max' : ''}`}>
+      <div className={`jolt-grid ${layout === 'columns' ? 'jolt-cols' : ''} ${maximized !== null ? 'jolt-grid-max' : ''}`}>
         {visible('input') && (
           <div className="split-pane">
             <div className="pane-header">
@@ -364,7 +445,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         </div>
         )}
 
-        {visible('history') && (
+        {layout === 'grid' && visible('history') && (
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">Histórico ({history.length})</span>
@@ -373,41 +454,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
             </button>
             {maxButton('history')}
           </div>
-          <div className="pane-body">
-            {history.length === 0 ? (
-              <div className="placeholder">As execuções ficam registradas aqui e sobrevivem a reloads da página.</div>
-            ) : (
-              <div className="history-list">
-                {history.map((e) => (
-                  <div key={e.id} className={`history-item ${e.ok ? '' : 'history-failed'}`}>
-                    <div className="history-head">
-                      <span className={`history-status ${e.ok ? 'ok' : 'fail'}`}>{e.ok ? '✓' : '✗'}</span>
-                      <span className="history-title" title={entryTitle(e)}>
-                        {entryTitle(e)}
-                      </span>
-                      <span className="history-time">
-                        {new Date(e.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                    </div>
-                    <div className="history-actions">
-                      <button className="btn btn-small" onClick={() => restore(e)} title="Restaurar entrada e spec e reexecutar os passos desta execução">
-                        Restaurar
-                      </button>
-                      {e.ok && <CopyButton small label="Copiar saída" text={e.result} />}
-                      <button
-                        className="btn btn-small btn-danger-ghost"
-                        onClick={() => setHistory((h) => h.filter((x) => x.id !== e.id))}
-                        title="Remover do histórico"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    {!e.ok && <div className="history-error">{e.result}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="pane-body">{historyList}</div>
         </div>
         )}
       </div>
