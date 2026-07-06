@@ -217,15 +217,19 @@ function walk(
     }
   }
 
-  // 2) Correspondência das chaves da entrada com as chaves da spec (a mais específica vence)
-  if (input === null || input === undefined || typeof input !== 'object') return;
+  // 2) Correspondência das chaves da entrada com as chaves da spec (a mais específica vence).
+  //    Valores escalares são casados como se fossem chaves (idioma de filtro do Jolt,
+  //    ex.: "ReserveType": { "01": {...} } casa o valor "01").
+  if (input === null || input === undefined) return;
+  const isScalar = typeof input !== 'object';
   const ordered = orderSpecKeys(keys.filter((k) => !/^[$#@]/.test(k)));
+  const inputKeys = isScalar ? [String(input)] : containerKeys(input);
 
-  for (const inputKey of containerKeys(input)) {
+  for (const inputKey of inputKeys) {
     for (const specKey of ordered) {
       const { matched, groups } = matchKey(specKey, inputKey, walked);
       if (!matched) continue;
-      const childValue = containerGet(input, inputKey);
+      const childValue = isScalar ? null : containerGet(input, inputKey);
       const level: WalkLevel = {
         key: inputKey,
         groups,
