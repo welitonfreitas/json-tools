@@ -121,6 +121,8 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   // Passo selecionado no navegador; null = último (resultado final)
   const [selected, setSelected] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Painel maximizado em tela cheia dentro da ferramenta (Esc restaura)
+  const [maximized, setMaximized] = useState<'input' | 'spec' | 'output' | 'history' | null>(null);
 
   // Nova execução volta a seleção para o resultado final
   useEffect(() => {
@@ -173,7 +175,22 @@ export default function JoltTool({ tabId }: { tabId: string }) {
       e.preventDefault();
       runChain(true);
     }
+    if (e.key === 'Escape' && maximized !== null) {
+      setMaximized(null);
+    }
   };
+
+  const maxButton = (pane: 'input' | 'spec' | 'output' | 'history') => (
+    <button
+      className="btn btn-small btn-max"
+      onClick={() => setMaximized(maximized === pane ? null : pane)}
+      title={maximized === pane ? 'Restaurar layout (Esc)' : 'Maximizar este painel'}
+    >
+      {maximized === pane ? '🗗 Restaurar' : '⛶'}
+    </button>
+  );
+
+  const visible = (pane: 'input' | 'spec' | 'output' | 'history') => maximized === null || maximized === pane;
 
   return (
     <div className="tool" onKeyDown={onKeyDown}>
@@ -210,35 +227,43 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         </div>
       )}
 
-      <div className="jolt-grid">
-        <div className="split-pane">
-          <div className="pane-header">
-            <span className="pane-title">Entrada</span>
-            <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
-              Limpar
-            </button>
+      <div className={`jolt-grid ${maximized !== null ? 'jolt-grid-max' : ''}`}>
+        {visible('input') && (
+          <div className="split-pane">
+            <div className="pane-header">
+              <span className="pane-title">Entrada</span>
+              <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
+                Limpar
+              </button>
+              {maxButton('input')}
+            </div>
+            <div className="editor-fill">
+              <JsonEditor value={input} onChange={setInput} placeholder="JSON de entrada…" />
+            </div>
           </div>
-          <div className="editor-fill">
-            <JsonEditor value={input} onChange={setInput} placeholder="JSON de entrada…" />
-          </div>
-        </div>
+        )}
 
-        <div className="split-pane">
-          <div className="pane-header">
-            <span className="pane-title">Spec (cadeia de operações)</span>
-            <button className="btn btn-small btn-danger-ghost" onClick={() => setSpec('')} disabled={spec === ''}>
-              Limpar
-            </button>
+        {visible('spec') && (
+          <div className="split-pane">
+            <div className="pane-header">
+              <span className="pane-title">Spec (cadeia de operações)</span>
+              <button className="btn btn-small btn-danger-ghost" onClick={() => setSpec('')} disabled={spec === ''}>
+                Limpar
+              </button>
+              {maxButton('spec')}
+            </div>
+            <div className="editor-fill">
+              <JsonEditor value={spec} onChange={setSpec} placeholder='[{"operation": "shift", "spec": {…}}]' />
+            </div>
           </div>
-          <div className="editor-fill">
-            <JsonEditor value={spec} onChange={setSpec} placeholder='[{"operation": "shift", "spec": {…}}]' />
-          </div>
-        </div>
+        )}
 
+        {visible('output') && (
         <div className="split-pane jolt-output">
           <div className="pane-header">
             <span className="pane-title">Saída {stepCaption && <span className="step-caption">· {stepCaption}</span>}</span>
             {selectedStep?.ok && <CopyButton small text={() => selectedStep.text} />}
+            {maxButton('output')}
           </div>
           {steps.length > 0 && (
             <div className="step-bar" role="tablist" aria-label="Passos da transformação">
@@ -277,13 +302,16 @@ export default function JoltTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
+        )}
 
+        {visible('history') && (
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">Histórico ({history.length})</span>
             <button className="btn btn-small btn-danger-ghost" onClick={() => setHistory([])} disabled={history.length === 0}>
               Limpar histórico
             </button>
+            {maxButton('history')}
           </div>
           <div className="pane-body">
             {history.length === 0 ? (
@@ -321,6 +349,7 @@ export default function JoltTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
+        )}
       </div>
 
       <div className={`statusbar ${steps.length === 0 ? '' : finalOk ? 'status-ok' : 'status-error'}`}>

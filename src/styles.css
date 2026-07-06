@@ -747,6 +747,16 @@ mark {
   gap: 10px;
 }
 
+.jolt-grid-max {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.btn-max {
+  padding: 4px 8px;
+  line-height: 1;
+}
+
 .step-bar {
   display: flex;
   align-items: center;
