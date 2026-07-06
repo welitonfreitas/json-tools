@@ -5,6 +5,7 @@ import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { joltTransformSteps, SUPPORTED_OPERATIONS } from '../lib/jolt';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
+import DiffView from '../components/DiffView';
 
 const SAMPLE_INPUT = `{
   "rating": {
@@ -123,6 +124,8 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   const [showHelp, setShowHelp] = useState(false);
   // Painel maximizado em tela cheia dentro da ferramenta (Esc restaura)
   const [maximized, setMaximized] = useState<'input' | 'spec' | 'output' | 'history' | null>(null);
+  // Modo de visualização do passo: JSON completo ou diff em relação ao passo anterior
+  const [viewMode, setViewMode] = useState<'json' | 'diff'>('json');
 
   // Nova execução volta a seleção para o resultado final
   useEffect(() => {
@@ -286,6 +289,24 @@ export default function JoltTool({ tabId }: { tabId: string }) {
         <div className="split-pane jolt-output">
           <div className="pane-header">
             <span className="pane-title">Saída {stepCaption && <span className="step-caption">· {stepCaption}</span>}</span>
+            {steps.length > 0 && (
+              <span className="seg-toggle" role="group" aria-label="Modo de visualização">
+                <button
+                  className={`seg-option ${viewMode === 'json' ? 'seg-active' : ''}`}
+                  onClick={() => setViewMode('json')}
+                  title="Ver o payload completo do passo selecionado"
+                >
+                  JSON
+                </button>
+                <button
+                  className={`seg-option ${viewMode === 'diff' ? 'seg-active' : ''}`}
+                  onClick={() => setViewMode('diff')}
+                  title="Ver somente o que a operação selecionada mudou (antes × depois)"
+                >
+                  Diff
+                </button>
+              </span>
+            )}
             {selectedStep?.ok && <CopyButton small text={() => selectedStep.text} />}
             {maxButton('output')}
           </div>
@@ -316,13 +337,28 @@ export default function JoltTool({ tabId }: { tabId: string }) {
               ))}
             </div>
           )}
-          <div className="editor-fill">
+          <div className={viewMode === 'diff' && selectedStep !== null ? 'pane-body' : 'editor-fill'}>
             {selectedStep === null ? (
               <div className="placeholder">Clique em ▶ Executar para rodar a cadeia e navegar pelos resultados de cada operação.</div>
-            ) : selectedStep.ok ? (
-              <JsonEditor value={selectedStep.text} readOnly />
-            ) : (
+            ) : !selectedStep.ok ? (
               <div className="placeholder placeholder-error jolt-error">✗ {selectedStep.text}</div>
+            ) : viewMode === 'json' ? (
+              <JsonEditor value={selectedStep.text} readOnly />
+            ) : selectedIndex === 0 ? (
+              <div className="placeholder">
+                A Entrada é o ponto de partida — não há passo anterior para comparar. Selecione uma operação para ver o
+                que ela mudou.
+              </div>
+            ) : !steps[selectedIndex - 1].ok ? (
+              <div className="placeholder placeholder-error">O passo anterior falhou — não há payload para comparar.</div>
+            ) : (
+              <DiffView
+                a={JSON.parse(steps[selectedIndex - 1].text)}
+                b={JSON.parse(selectedStep.text)}
+                labelA={selectedIndex === 1 ? 'Entrada' : `Após #${selectedIndex - 1} (${steps[selectedIndex - 1].label})`}
+                labelB={`Após #${selectedIndex} (${selectedStep.label})`}
+                emptyMessage={`A operação #${selectedIndex} (${selectedStep.label}) não alterou a estrutura do payload.`}
+              />
             )}
           </div>
         </div>
