@@ -138,6 +138,27 @@ describe('modify', () => {
     expect(joltTransform(spec, input)).toEqual({ a: 5, b: 2 });
   });
 
+  it('divideAndRound, subtrações e pads', () => {
+    const input = { total: 10, qtd: 3, cod: '42' };
+    const spec = [
+      {
+        operation: 'modify-overwrite-beta',
+        spec: {
+          media: '=divideAndRound(2,@(1,total),@(1,qtd))',
+          resto: '=intSubtract(@(1,total),@(1,qtd))',
+          cod: "=leftPad(@(1,cod),5,'0')",
+        },
+      },
+    ];
+    expect(joltTransform(spec, input)).toEqual({ total: 10, qtd: 3, cod: '00042', media: 3.33, resto: 7 });
+  });
+
+  it('aliases oficiais toUpper/toLower', () => {
+    const input = { a: 'abc', b: 'XYZ' };
+    const spec = [{ operation: 'modify-overwrite-beta', spec: { a: '=toUpper', b: '=toLower' } }];
+    expect(joltTransform(spec, input)).toEqual({ a: 'ABC', b: 'xyz' });
+  });
+
   it('size, sum e sort em arrays', () => {
     const input = { ns: [3, 1, 2] };
     const spec = [

@@ -86,7 +86,20 @@ const FUNCTIONS: Record<string, Fn> = {
   },
   toUpperCase: (a) => (typeof a[0] === 'string' ? a[0].toUpperCase() : undefined),
   toLowerCase: (a) => (typeof a[0] === 'string' ? a[0].toLowerCase() : undefined),
+  // Nomes oficiais do Jolt (toUpper/toLower); os acima ficam como aliases
+  toUpper: (a) => FUNCTIONS.toUpperCase(a),
+  toLower: (a) => FUNCTIONS.toLowerCase(a),
   trim: (a) => (typeof a[0] === 'string' ? a[0].trim() : undefined),
+  leftPad: (a) => {
+    const [str, size, pad] = a;
+    if (typeof str !== 'string') return undefined;
+    return str.padStart(Number(size), pad === undefined ? ' ' : String(pad));
+  },
+  rightPad: (a) => {
+    const [str, size, pad] = a;
+    if (typeof str !== 'string') return undefined;
+    return str.padEnd(Number(size), pad === undefined ? ' ' : String(pad));
+  },
   concat: (a) => a.filter((v) => v !== undefined && v !== null).map(String).join(''),
   join: (a) => {
     const [sep, arr] = a;
@@ -152,6 +165,24 @@ const FUNCTIONS: Record<string, Fn> = {
     const [x, y] = nums(a);
     return y ? x / y : undefined;
   },
+  // divideAndRound(casasDecimais, numerador, denominador) — como no Jolt oficial
+  divideAndRound: (a) => {
+    const [digits, x, y] = nums(a);
+    if (digits === undefined || x === undefined || !y) return undefined;
+    const factor = Math.pow(10, Math.trunc(digits));
+    return Math.round((x / y) * factor) / factor;
+  },
+  intSubtract: (a) => {
+    const [x, y] = nums(a);
+    return x === undefined || y === undefined ? undefined : Math.trunc(x - y);
+  },
+  longSubtract: (a) => FUNCTIONS.intSubtract(a),
+  doubleSubtract: (a) => {
+    const [x, y] = nums(a);
+    return x === undefined || y === undefined ? undefined : x - y;
+  },
+  longSum: (a) => FUNCTIONS.intSum(a),
+  toList: (a) => (Array.isArray(a[0]) ? a[0] : a[0] === undefined ? undefined : [a[0]]),
   sort: (a) => {
     const arr = asArray(a[0]);
     return [...arr].sort((x, y) => {

@@ -23,7 +23,7 @@ Como não existe implementação JavaScript mantida do Jolt, este projeto inclui
 
 - **shift** — chaves literais, `a|b`, `*`, padrões `foo*`, `&`/`&(n)`/`&(n,k)` (LHS e RHS), `$`/`$(n,k)`, `#literal`, `@`/`@(n,caminho)`; no destino `[]`, `[&n]`, `[#n]`, índices fixos e múltiplos destinos
 - **default**, **remove**, **sort**, **cardinality**
-- **modify-overwrite-beta** / **modify-default-beta** — `=toString`, `=toInteger`, `=toDouble`, `=toBoolean`, `=toUpperCase`, `=toLowerCase`, `=trim`, `=concat`, `=join`, `=split`, `=substring`, `=size`, `=firstElement`, `=lastElement`, `=elementAt`, `=min`, `=max`, `=abs`, `=avg`, `=sum`, `=intSum`, `=doubleSum`, `=divide`, `=sort`, `=squashNulls`, além de referências `@(n,caminho)` e listas de fallback
+- **modify-overwrite-beta** / **modify-default-beta** — `=toString`, `=toInteger`, `=toLong`, `=toDouble`, `=toBoolean`, `=toUpper`/`=toUpperCase`, `=toLower`/`=toLowerCase`, `=trim`, `=leftPad`, `=rightPad`, `=concat`, `=join`, `=split`, `=substring`, `=size`, `=firstElement`, `=lastElement`, `=elementAt`, `=toList`, `=min`, `=max`, `=abs`, `=avg`, `=sum`, `=intSum`, `=longSum`, `=doubleSum`, `=intSubtract`, `=longSubtract`, `=doubleSubtract`, `=divide`, `=divideAndRound`, `=sort`, `=squashNulls`, além de referências `@(n,caminho)` e listas de fallback
 
 Casos de canto muito avançados do Jolt original (Java) podem divergir; o motor cobre os usos comuns de transformação e é validado por testes (`npm test`).
 
