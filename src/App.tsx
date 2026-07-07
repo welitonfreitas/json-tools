@@ -9,6 +9,7 @@ import JsonPathTool from './tools/JsonPathTool';
 import JoltTool from './tools/JoltTool';
 import DiffTool from './tools/DiffTool';
 import TableTool from './tools/TableTool';
+import SchemaTool from './tools/SchemaTool';
 
 interface ToolDef {
   id: string;
@@ -67,6 +68,13 @@ const TOOLS: ToolDef[] = [
     icon: '▦',
     description: 'Transforme um array JSON em tabela com exportação para HTML, CSV e Excel',
     render: (tabId) => <TableTool tabId={tabId} />,
+  },
+  {
+    id: 'schema',
+    name: 'Schema Validator',
+    icon: '✓',
+    description: 'Valide um payload contra um JSON Schema com erros interativos em português',
+    render: (tabId) => <SchemaTool tabId={tabId} />,
   },
 ];
 

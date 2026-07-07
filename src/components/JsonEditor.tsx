@@ -13,6 +13,8 @@ interface Props {
   placeholder?: string;
   /** Desliga o modo JSON (para texto livre, ex.: escape/unescape). */
   plainText?: boolean;
+  /** Recebe a EditorView criada (para navegação programática). */
+  onView?: (view: EditorView) => void;
 }
 
 const lightTheme = EditorView.theme({
@@ -20,7 +22,7 @@ const lightTheme = EditorView.theme({
   '.cm-gutters': { backgroundColor: '#f4f6f8', color: '#9aa4b1', border: 'none' },
 });
 
-export default function JsonEditor({ value, onChange, height = '100%', readOnly, placeholder, plainText }: Props) {
+export default function JsonEditor({ value, onChange, height = '100%', readOnly, placeholder, plainText, onView }: Props) {
   const { theme } = useContext(ThemeContext);
   const extensions = useMemo(() => {
     const ext = [EditorView.lineWrapping];
@@ -33,6 +35,7 @@ export default function JsonEditor({ value, onChange, height = '100%', readOnly,
     <CodeMirror
       value={value}
       onChange={onChange}
+      onCreateEditor={onView}
       readOnly={readOnly}
       height={height}
       placeholder={placeholder}
