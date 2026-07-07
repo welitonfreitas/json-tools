@@ -1126,6 +1126,12 @@ mark {
   accent-color: var(--accent);
 }
 
+.select-source {
+  font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+  font-size: 12px;
+  max-width: 320px;
+}
+
 .table-scroll {
   padding: 0;
 }
