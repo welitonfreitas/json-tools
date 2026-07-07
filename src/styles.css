@@ -1110,6 +1110,94 @@ mark {
   color: var(--warn);
 }
 
+/* ---------- array → tabela ---------- */
+
+.check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.check-label input {
+  accent-color: var(--accent);
+}
+
+.table-scroll {
+  padding: 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.data-table th:hover {
+  color: var(--accent);
+}
+
+.sort-arrow {
+  color: var(--accent);
+}
+
+.data-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.cell-number {
+  color: var(--number-color);
+}
+
+.cell-boolean {
+  color: var(--boolean-color);
+}
+
+.cell-null {
+  color: var(--null-color);
+  font-style: italic;
+}
+
+.cell-json {
+  color: var(--text-dim);
+}
+
+.table-note {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 900px) {

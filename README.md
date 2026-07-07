@@ -12,6 +12,7 @@ Ferramentas para manipulação de JSON no dia a dia — um app web que roda **10
 | **JSONPath** | Testa expressões JSONPath (via [jsonpath-plus](https://github.com/JSONPath-Plus/JSONPath)) com resultados, caminhos, exemplos e histórico de consultas |
 | **Jolt** | Aplica specs [Jolt](https://github.com/bazaarvoice/jolt) com **histórico de execuções persistente** (restaurar/copiar/remover), ajuda embutida e `Ctrl+Enter` para executar |
 | **Comparar** | Diff estrutural entre dois JSONs (adicionado/removido/alterado, por caminho) |
+| **Array → Tabela** | Transforma um array JSON em tabela (objetos aninhados viram colunas `a.b`, ordenação por coluna) com exportação para HTML, CSV (`;` ou `,`, UTF-8 com BOM), Excel (.xls) e cópia em TSV para colar em planilhas |
 
 Editores com syntax highlighting, dobra de código (folding) e realce de erros via CodeMirror 6. Tema escuro/claro persistente. Cada ferramenta tem URL própria (`#/format`, `#/tree`, `#/escape`, `#/jsonpath`, `#/jolt`, `#/diff`).
 
