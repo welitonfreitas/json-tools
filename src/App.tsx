@@ -8,6 +8,7 @@ import EscapeTool from './tools/EscapeTool';
 import JsonPathTool from './tools/JsonPathTool';
 import JoltTool from './tools/JoltTool';
 import DiffTool from './tools/DiffTool';
+import TableTool from './tools/TableTool';
 
 interface ToolDef {
   id: string;
@@ -59,6 +60,13 @@ const TOOLS: ToolDef[] = [
     icon: '≠',
     description: 'Compare dois JSONs e veja as diferenças estruturais',
     render: (tabId) => <DiffTool tabId={tabId} />,
+  },
+  {
+    id: 'table',
+    name: 'Array → Tabela',
+    icon: '▦',
+    description: 'Transforme um array JSON em tabela com exportação para HTML, CSV e Excel',
+    render: (tabId) => <TableTool tabId={tabId} />,
   },
 ];
 
