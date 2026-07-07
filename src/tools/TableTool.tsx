@@ -3,7 +3,16 @@ import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState } from '../lib/persist';
 import { tryParseJson, downloadText } from '../lib/jsonUtils';
-import { jsonArrayToTable, cellText, toCSV, toTSV, toHTMLDocument, toExcelXls } from '../lib/tableUtils';
+import {
+  jsonArrayToTable,
+  cellText,
+  toCSV,
+  toTSV,
+  toHTMLDocument,
+  toExcelXls,
+  findArraySources,
+  getAtSegments,
+} from '../lib/tableUtils';
 
 const SAMPLE = `[
   { "id": 1, "nome": "Ana", "endereco": { "cidade": "São Paulo", "uf": "SP" }, "ativo": true, "salario": 7500.5 },
@@ -20,13 +29,27 @@ export default function TableTool({ tabId }: { tabId: string }) {
   const [text, setText] = usePersistentState(`table:${tabId}:text`, SAMPLE);
   const [flatten, setFlatten] = usePersistentState<boolean>(`table:${tabId}:flatten`, true);
   const [sep, setSep] = usePersistentState<';' | ','>('table:csvsep', ';');
+  // Origem do array: '' = automático (raiz, ou o único array encontrado)
+  const [sourceLabel, setSourceLabel] = usePersistentState<string>(`table:${tabId}:source`, '');
   const [sort, setSort] = useState<{ col: string; dir: SortDir } | null>(null);
 
   const parsed = useMemo(() => tryParseJson(text), [text]);
+
+  // Onde há arrays no JSON colado (raiz e/ou propriedades)
+  const sources = useMemo(() => (parsed.ok ? findArraySources(parsed.value) : []), [parsed]);
+  const activeSource = useMemo(() => {
+    if (sources.length === 0) return null;
+    return sources.find((s) => s.label === sourceLabel) ?? sources.find((s) => s.label === '(raiz)') ?? sources[0];
+  }, [sources, sourceLabel]);
+
   const table = useMemo(() => {
     if (!parsed.ok) return null;
-    return jsonArrayToTable(parsed.value, flatten);
-  }, [parsed, flatten]);
+    if (activeSource === null) {
+      return { error: 'Nenhum array encontrado no JSON — cole um array ou um objeto que contenha um array em alguma propriedade.' };
+    }
+    const arr = activeSource.segments.length === 0 ? parsed.value : getAtSegments(parsed.value, activeSource.segments);
+    return jsonArrayToTable(arr, flatten);
+  }, [parsed, activeSource, flatten]);
 
   const data = table !== null && !('error' in table) ? table : null;
 
@@ -71,6 +94,24 @@ export default function TableTool({ tabId }: { tabId: string }) {
   return (
     <div className="tool">
       <div className="toolbar">
+        {sources.length > 0 && (sources.length > 1 || sources[0].label !== '(raiz)') && (
+          <>
+            <span className="chip-label">Array em:</span>
+            <select
+              className="select select-source"
+              value={activeSource?.label ?? ''}
+              onChange={(e) => setSourceLabel(e.target.value)}
+              title="Escolha em qual propriedade do JSON está o array a tabelar"
+            >
+              {sources.map((s) => (
+                <option key={s.label} value={s.label}>
+                  {s.label} ({s.length} {s.length === 1 ? 'item' : 'itens'})
+                </option>
+              ))}
+            </select>
+            <span className="toolbar-sep" />
+          </>
+        )}
         <label className="check-label" title="Objetos aninhados viram colunas com ponto (ex.: endereco.cidade)">
           <input type="checkbox" checked={flatten} onChange={(e) => setFlatten(e.target.checked)} />
           Achatar objetos aninhados
@@ -127,6 +168,9 @@ export default function TableTool({ tabId }: { tabId: string }) {
           <div className="pane-header">
             <span className="pane-title">
               Tabela{data ? ` (${data.rows.length} ${data.rows.length === 1 ? 'linha' : 'linhas'} × ${data.columns.length} colunas)` : ''}
+              {data && activeSource && activeSource.label !== '(raiz)' && (
+                <span className="step-caption"> · de {activeSource.label}</span>
+              )}
             </span>
           </div>
           <div className="pane-body table-scroll">

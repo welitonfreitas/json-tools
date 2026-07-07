@@ -19,6 +19,42 @@ function flattenInto(value: unknown, prefix: string, out: Record<string, unknown
   }
 }
 
+export interface ArraySource {
+  /** Rótulo exibível: "(raiz)" ou o caminho da propriedade (ex.: request.body.itens). */
+  label: string;
+  segments: string[];
+  length: number;
+}
+
+/**
+ * Descobre onde há arrays no JSON: na raiz ou em propriedades (busca recursiva
+ * em objetos, sem descer para dentro dos arrays encontrados).
+ */
+export function findArraySources(value: unknown, maxDepth = 8): ArraySource[] {
+  const out: ArraySource[] = [];
+  const visit = (v: unknown, segs: string[], depth: number): void => {
+    if (Array.isArray(v)) {
+      out.push({ label: segs.length === 0 ? '(raiz)' : segs.join('.'), segments: [...segs], length: v.length });
+      return;
+    }
+    if (v !== null && typeof v === 'object' && depth < maxDepth) {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) visit(child, [...segs, k], depth + 1);
+    }
+  };
+  visit(value, [], 0);
+  return out;
+}
+
+/** Navega pelos segmentos de chave (sem interpretar pontos dentro das chaves). */
+export function getAtSegments(value: unknown, segments: string[]): unknown {
+  let cur = value;
+  for (const seg of segments) {
+    if (cur === null || typeof cur !== 'object' || Array.isArray(cur)) return undefined;
+    cur = (cur as Record<string, unknown>)[seg];
+  }
+  return cur;
+}
+
 /** Converte um array JSON em tabela. `flatten` achata objetos aninhados em colunas "a.b". */
 export function jsonArrayToTable(value: unknown, flatten: boolean): TableData | { error: string } {
   if (!Array.isArray(value)) {

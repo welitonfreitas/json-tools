@@ -1,5 +1,45 @@
 import { describe, it, expect } from 'vitest';
-import { jsonArrayToTable, toCSV, toTSV, toHTMLDocument, toExcelXls, TableData } from './tableUtils';
+import {
+  jsonArrayToTable,
+  toCSV,
+  toTSV,
+  toHTMLDocument,
+  toExcelXls,
+  findArraySources,
+  getAtSegments,
+  TableData,
+} from './tableUtils';
+
+describe('findArraySources', () => {
+  it('raiz array retorna apenas (raiz)', () => {
+    expect(findArraySources([1, 2])).toEqual([{ label: '(raiz)', segments: [], length: 2 }]);
+  });
+
+  it('descobre arrays em propriedades aninhadas, sem entrar nos arrays', () => {
+    const value = {
+      total: 2,
+      dados: { itens: [{ a: 1 }], paginas: [1, 2, 3] },
+      historico: [{ sub: [9] }],
+    };
+    const sources = findArraySources(value);
+    expect(sources).toEqual([
+      { label: 'dados.itens', segments: ['dados', 'itens'], length: 1 },
+      { label: 'dados.paginas', segments: ['dados', 'paginas'], length: 3 },
+      { label: 'historico', segments: ['historico'], length: 1 },
+    ]);
+  });
+
+  it('sem arrays retorna vazio', () => {
+    expect(findArraySources({ a: 1, b: { c: 'x' } })).toEqual([]);
+    expect(findArraySources('escalar')).toEqual([]);
+  });
+
+  it('getAtSegments navega por chaves com ponto no nome', () => {
+    const value = { 'a.b': { itens: [1] } };
+    const sources = findArraySources(value);
+    expect(getAtSegments(value, sources[0].segments)).toEqual([1]);
+  });
+});
 
 describe('jsonArrayToTable', () => {
   it('extrai colunas na ordem de aparição, unindo chaves de todos os itens', () => {
