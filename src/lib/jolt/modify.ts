@@ -58,7 +58,9 @@ function splitArgs(s: string): string[] {
 
 function parseArg(arg: string, walked: ModifyLevel[]): Json | undefined {
   if (arg.startsWith('@')) {
-    const m = arg.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
+    // O caminho é tratado literalmente, como no Jolt: "@(1, Campo)" procura a
+    // chave " Campo" (com espaço) e não resolve — espaços não são aparados.
+    const m = arg.match(/^@\((\d+)(?:,(.*))?\)$/s);
     if (m) {
       return lookupPath(levelValue(walked, parseInt(m[1], 10)), resolveAmpInPath(m[2] ?? '', walked)) as
         | Json
@@ -273,7 +275,8 @@ function evalRhs(rhs: Json, current: Json | undefined, walked: ModifyLevel[]): J
     return fn(args);
   }
   if (rhs.startsWith('@')) {
-    const m = rhs.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
+    // Caminho literal (sem aparar espaços), como no Jolt
+    const m = rhs.match(/^@\((\d+)(?:,(.*))?\)$/s);
     if (m) {
       return lookupPath(levelValue(walked, parseInt(m[1], 10)), resolveAmpInPath(m[2] ?? '', walked)) as
         | Json

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { EditorView } from '@codemirror/view';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState, loadPersisted } from '../lib/persist';
@@ -6,6 +7,10 @@ import { tryParseJson } from '../lib/jsonUtils';
 import { joltTransformSteps, SUPPORTED_OPERATIONS } from '../lib/jolt';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
 import DiffView from '../components/DiffView';
+import { highlightField, highlightRange } from '../lib/cmHighlight';
+import { findJsonRange } from '../lib/jsonLocator';
+
+const SPEC_HIGHLIGHT_EXTENSIONS = [highlightField];
 
 const SAMPLE_INPUT = `{
   "rating": {
@@ -129,11 +134,29 @@ export default function JoltTool({ tabId }: { tabId: string }) {
   // Layout: 3 colunas (Entrada | Spec | Saída, histórico na barra) ou grade 2×2
   const [layout, setLayout] = usePersistentState<'columns' | 'grid'>('jolt:layout', 'columns');
   const [showHistory, setShowHistory] = useState(false);
+  // View do editor da spec (useState para reagir quando o editor é recriado, ex.: ao maximizar)
+  const [specView, setSpecView] = useState<EditorView | null>(null);
 
   // Nova execução volta a seleção para o resultado final
   useEffect(() => {
     setSelected(null);
   }, [run?.ts]);
+
+  const steps = run?.steps ?? [];
+  const lastIndex = steps.length - 1;
+  const selectedIndex = selected === null ? lastIndex : Math.min(selected, lastIndex);
+  const selectedStep = selectedIndex >= 0 ? steps[selectedIndex] : null;
+
+  // Destaca na spec a operação correspondente ao passo selecionado
+  // (passo N = elemento [N-1] do array da spec; Entrada limpa o realce)
+  useEffect(() => {
+    if (!specView) return;
+    if (selectedIndex >= 1 && selectedStep !== null && selectedStep.label !== 'spec') {
+      highlightRange(specView, findJsonRange(specView, [selectedIndex - 1]));
+    } else {
+      highlightRange(specView, null);
+    }
+  }, [specView, selectedIndex, selectedStep, run?.ts]);
 
   const runChain = (recordHistory: boolean, inputText = input, specText = spec) => {
     const newRun = computeRun(inputText, specText);
@@ -159,10 +182,6 @@ export default function JoltTool({ tabId }: { tabId: string }) {
     runChain(false, e.input, e.spec);
   };
 
-  const steps = run?.steps ?? [];
-  const lastIndex = steps.length - 1;
-  const selectedIndex = selected === null ? lastIndex : Math.min(selected, lastIndex);
-  const selectedStep = selectedIndex >= 0 ? steps[selectedIndex] : null;
   const finalOk = lastIndex >= 0 && steps[lastIndex].ok;
 
   const stepCaption =
@@ -390,7 +409,13 @@ export default function JoltTool({ tabId }: { tabId: string }) {
               {maxButton('spec')}
             </div>
             <div className="editor-fill">
-              <JsonEditor value={spec} onChange={setSpec} placeholder='[{"operation": "shift", "spec": {…}}]' />
+              <JsonEditor
+                value={spec}
+                onChange={setSpec}
+                onView={setSpecView}
+                extraExtensions={SPEC_HIGHLIGHT_EXTENSIONS}
+                placeholder='[{"operation": "shift", "spec": {…}}]'
+              />
             </div>
           </div>
         )}

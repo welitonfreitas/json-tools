@@ -277,6 +277,30 @@ describe('modify: casos avançados', () => {
     expect(joltTransform(spec, input)).toEqual({ outro: 1, ds: '.' });
   });
 
+  it('caminhos @ são literais: espaço no caminho impede a resolução (como no Jolt)', () => {
+    const input = { EcsUpdateTime: '2026-07-08T10:43:45', ClaimNo: 'X' };
+    const spec = [
+      {
+        operation: 'modify-overwrite-beta',
+        spec: {
+          // "@(1, EcsUpdateTime)" procura a chave " EcsUpdateTime" (com espaço) → não existe
+          com_espaco: '=substring(@(1, EcsUpdateTime),0,10)',
+          sem_espaco: '=substring(@(1,EcsUpdateTime),0,10)',
+        },
+      },
+      {
+        operation: 'modify-overwrite-beta',
+        spec: { filtro: "=concat(@(1,ClaimNo), ';', @(1,com_espaco), ';', @(1,sem_espaco))" },
+      },
+    ];
+    expect(joltTransform(spec, input)).toEqual({
+      EcsUpdateTime: '2026-07-08T10:43:45',
+      ClaimNo: 'X',
+      sem_espaco: '2026-07-08',
+      filtro: 'X;;2026-07-08',
+    });
+  });
+
   it('modify posterior enxerga escritas de chaves anteriores da mesma operação', () => {
     const input = { a: 2 };
     const spec = [
