@@ -82,7 +82,8 @@ export function lookupPath(value: Json | undefined, path: string): Json | undefi
 export function resolveAt(token: string, walked: WalkLevel[]): Json | undefined {
   if (token === '@') return levelUp(walked, 0).value;
   const resolvePath = (p: string): string => (p.includes('&') ? resolveAmp(p, walked) : p);
-  const paren = token.match(/^@\((\d+)(?:\s*,\s*(.+?)\s*)?\)$/);
+  // O caminho é literal (sem aparar espaços), como no Jolt
+  const paren = token.match(/^@\((\d+)(?:,(.*))?\)$/s);
   if (paren) {
     const level = levelUp(walked, parseInt(paren[1], 10));
     return lookupPath(level.value, resolvePath(paren[2] ?? ''));
