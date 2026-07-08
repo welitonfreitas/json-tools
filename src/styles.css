@@ -966,6 +966,13 @@ mark {
   border-color: var(--error);
 }
 
+/* Operação da spec correspondente ao passo selecionado na saída */
+.cm-op-highlight {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: 2px;
+}
+
 .step-caption {
   text-transform: none;
   letter-spacing: 0;
