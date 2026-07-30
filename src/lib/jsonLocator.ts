@@ -72,6 +72,37 @@ export function findJsonRange(view: EditorView, path: (string | number)[]): { fr
   return best;
 }
 
+/** Caminho (estilo JSONPath) do nó JSON onde `pos` está, ex.: $.itens[0].preco */
+export function pathAtPosition(view: EditorView, pos: number): string {
+  const tree = syntaxTree(view.state);
+  let node: SyntaxNode | null = tree.resolveInner(pos, -1);
+  const parts: string[] = [];
+
+  while (node && node.parent) {
+    const parent: SyntaxNode = node.parent;
+    if (parent.name === 'Property') {
+      const nameNode = parent.getChild('PropertyName');
+      if (nameNode) {
+        try {
+          const key = String(JSON.parse(view.state.sliceDoc(nameNode.from, nameNode.to)));
+          parts.unshift(/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `.${key}` : `['${key.replace(/'/g, "\\'")}']`);
+        } catch {
+          // chave malformada (JSON parcial) — ignora o segmento
+        }
+      }
+    } else if (parent.name === 'Array' && VALUE_NODES.has(node.name)) {
+      // Compara por posição: instâncias de SyntaxNode não têm identidade estável
+      let idx = 0;
+      for (let c: SyntaxNode | null = parent.firstChild; c !== null && c.from < node.from; c = c.nextSibling) {
+        if (VALUE_NODES.has(c.name)) idx++;
+      }
+      parts.unshift(`[${idx}]`);
+    }
+    node = parent;
+  }
+  return `$${parts.join('')}`;
+}
+
 /** Seleciona e centraliza o intervalo no editor. */
 export function revealRange(view: EditorView, range: { from: number; to: number }): void {
   view.dispatch({

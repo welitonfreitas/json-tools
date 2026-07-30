@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
+import Split, { SplitMaxButton } from '../components/Split';
 import { usePersistentState } from '../lib/persist';
 import { tryParseJson, downloadText } from '../lib/jsonUtils';
 import {
@@ -154,10 +155,11 @@ export default function TableTool({ tabId }: { tabId: string }) {
         </button>
       </div>
 
-      <div className="split">
+      <Split storageKey="table">
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">Array JSON</span>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={text} onChange={setText} placeholder='[{"campo": "valor"}, …]' />
@@ -172,6 +174,7 @@ export default function TableTool({ tabId }: { tabId: string }) {
                 <span className="step-caption"> · de {activeSource.label}</span>
               )}
             </span>
+            <SplitMaxButton />
           </div>
           <div className="pane-body table-scroll">
             {error !== null ? (
@@ -218,7 +221,7 @@ export default function TableTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
-      </div>
+      </Split>
     </div>
   );
 }

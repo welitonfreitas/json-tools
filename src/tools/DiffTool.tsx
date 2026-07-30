@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import JsonEditor from '../components/JsonEditor';
+import Split, { SplitMaxButton } from '../components/Split';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { diffJson, diffCounts, DIFF_KIND_LABEL, fmtDiffValue } from '../lib/diff';
@@ -54,11 +55,12 @@ export default function DiffTool({ tabId }: { tabId: string }) {
         )}
       </div>
 
-      <div className="split">
+      <Split storageKey="diff">
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">A (original)</span>
             <span className="pane-note">{textA !== '' && !parsedA.ok ? '✗ inválido' : ''}</span>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={textA} onChange={setTextA} placeholder="JSON A…" />
@@ -68,12 +70,13 @@ export default function DiffTool({ tabId }: { tabId: string }) {
           <div className="pane-header">
             <span className="pane-title">B (novo)</span>
             <span className="pane-note">{textB !== '' && !parsedB.ok ? '✗ inválido' : ''}</span>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={textB} onChange={setTextB} placeholder="JSON B…" />
           </div>
         </div>
-      </div>
+      </Split>
 
       <div className="diff-results">
         {entries === null ? (

@@ -521,6 +521,101 @@ pre {
   overflow: hidden;
 }
 
+/* ---------- split redimensionável ---------- */
+
+.split-resizable {
+  gap: 0;
+}
+
+.split-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.split-divider-grip {
+  width: 3px;
+  height: 44px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.12s;
+}
+
+.split-divider:hover .split-divider-grip,
+body.col-resizing .split-divider-grip {
+  background: var(--accent);
+}
+
+body.col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* ---------- barra de status do editor ---------- */
+
+.editor-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.editor-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.es-pos {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.es-path {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.es-path:hover {
+  text-decoration: underline;
+}
+
+.es-spacer {
+  flex: 1;
+}
+
+.es-ok {
+  color: var(--ok);
+}
+
+.es-err {
+  color: var(--error);
+}
+
 .editor-fill .cm-editor {
   height: 100%;
 }

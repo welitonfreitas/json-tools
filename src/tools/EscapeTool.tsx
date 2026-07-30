@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
+import Split, { SplitMaxButton } from '../components/Split';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { escapeJsonString, unescapeJsonString, tryParseJson } from '../lib/jsonUtils';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
@@ -79,13 +80,14 @@ export default function EscapeTool({ tabId }: { tabId: string }) {
         </button>
       </div>
 
-      <div className="split">
+      <Split storageKey="escape">
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">Entrada</span>
             <button className="btn btn-small btn-danger-ghost" onClick={() => setInput('')} disabled={input === ''}>
               Limpar
             </button>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={input} onChange={setInput} plainText placeholder="Cole o texto ou JSON aqui…" />
@@ -95,12 +97,13 @@ export default function EscapeTool({ tabId }: { tabId: string }) {
           <div className="pane-header">
             <span className="pane-title">Saída</span>
             <CopyButton text={() => output} small />
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={output} readOnly plainText placeholder="O resultado aparece aqui…" />
           </div>
         </div>
-      </div>
+      </Split>
 
       <div className={`statusbar ${error ? 'status-error' : info ? 'status-ok' : ''}`}>
         <span>{error ? `✗ ${error}` : info ? `✓ ${info}` : 'Escolha uma operação acima'}</span>
