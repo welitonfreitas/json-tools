@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import JsonEditor from '../components/JsonEditor';
+import Split, { SplitMaxButton } from '../components/Split';
 import TreeView from '../components/TreeView';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson, computeStats, formatBytes } from '../lib/jsonUtils';
@@ -25,7 +26,7 @@ export default function TreeTool({ tabId }: { tabId: string }) {
 
   return (
     <div className="tool">
-      <div className="split">
+      <Split storageKey="tree">
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">JSON</span>
@@ -33,6 +34,7 @@ export default function TreeTool({ tabId }: { tabId: string }) {
             <button className="btn btn-small btn-danger-ghost" onClick={() => setText('')} disabled={text === ''}>
               Limpar
             </button>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={text} onChange={setText} placeholder="Cole seu JSON aqui…" />
@@ -54,6 +56,7 @@ export default function TreeTool({ tabId }: { tabId: string }) {
             <button className="btn btn-small" onClick={() => setExpandSignal((s) => ({ version: s.version + 1, expand: false }))}>
               Recolher tudo
             </button>
+            <SplitMaxButton />
           </div>
           <div className="pane-body">
             {parsed.ok ? (
@@ -74,7 +77,7 @@ export default function TreeTool({ tabId }: { tabId: string }) {
             </div>
           )}
         </div>
-      </div>
+      </Split>
     </div>
   );
 }

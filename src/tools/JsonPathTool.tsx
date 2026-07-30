@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { JSONPath } from 'jsonpath-plus';
 import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
+import Split, { SplitMaxButton } from '../components/Split';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
@@ -95,7 +96,7 @@ export default function JsonPathTool({ tabId }: { tabId: string }) {
         )}
       </div>
 
-      <div className="split">
+      <Split storageKey="jsonpath">
         <div className="split-pane">
           <div className="pane-header">
             <span className="pane-title">JSON</span>
@@ -103,6 +104,7 @@ export default function JsonPathTool({ tabId }: { tabId: string }) {
             <button className="btn btn-small btn-danger-ghost" onClick={() => setText('')} disabled={text === ''}>
               Limpar
             </button>
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={text} onChange={setText} placeholder="Cole seu JSON aqui…" />
@@ -117,6 +119,7 @@ export default function JsonPathTool({ tabId }: { tabId: string }) {
             {result && 'matches' in result && result.matches.length > 0 && (
               <CopyButton small label="Copiar tudo" text={() => JSON.stringify(result.matches.map((m) => m.value), null, 2)} />
             )}
+            <SplitMaxButton />
           </div>
           <div className="pane-body">
             {!parsed.ok ? (
@@ -148,7 +151,7 @@ export default function JsonPathTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
-      </div>
+      </Split>
     </div>
   );
 }

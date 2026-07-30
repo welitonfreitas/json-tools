@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { EditorView } from '@codemirror/view';
 import JsonEditor from '../components/JsonEditor';
+import Split, { SplitMaxButton } from '../components/Split';
 import { usePersistentState } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
 import { validateAgainstSchema, ValidationResult } from '../lib/schemaValidator';
@@ -101,11 +102,12 @@ export default function SchemaTool({ tabId }: { tabId: string }) {
         </button>
       </div>
 
-      <div className="split split-3">
+      <Split storageKey="schema" className="split-3">
         <div className={`split-pane ${!schemaParse.ok && schemaText.trim() !== '' ? 'pane-invalid' : ''}`}>
           <div className="pane-header">
             <span className="pane-title">JSON Schema</span>
             {badge(schemaParse, schemaText)}
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={schemaText} onChange={setSchemaText} onView={(v) => (schemaView.current = v)} placeholder='{"type": "object", …}' />
@@ -116,6 +118,7 @@ export default function SchemaTool({ tabId }: { tabId: string }) {
           <div className="pane-header">
             <span className="pane-title">Payload</span>
             {badge(payloadParse, payloadText)}
+            <SplitMaxButton />
           </div>
           <div className="editor-fill">
             <JsonEditor value={payloadText} onChange={setPayloadText} onView={(v) => (payloadView.current = v)} placeholder="JSON a validar…" />
@@ -127,6 +130,7 @@ export default function SchemaTool({ tabId }: { tabId: string }) {
             <span className="pane-title">
               Resultado{result?.kind === 'invalid' ? ` (${issueCount} ${issueCount === 1 ? 'erro' : 'erros'})` : ''}
             </span>
+            <SplitMaxButton />
           </div>
           <div className="pane-body">
             {schemaText.trim() === '' || payloadText.trim() === '' ? (
@@ -174,7 +178,7 @@ export default function SchemaTool({ tabId }: { tabId: string }) {
             )}
           </div>
         </div>
-      </div>
+      </Split>
     </div>
   );
 }
