@@ -1,6 +1,6 @@
 // Operações "modify-overwrite-beta" e "modify-default-beta" com as funções mais comuns.
 
-import { Json, JoltError, isPlainObject, deepCopy, starToRegex, lookupPath } from './common';
+import { Json, JoltError, isPlainObject, deepCopy, starToRegex, lookupPath, objKeys, setObjKey, setKeyOrder } from './common';
 
 interface ModifyLevel {
   key: string;
@@ -102,6 +102,49 @@ const asArray = (v: Json | undefined): Json[] => (Array.isArray(v) ? v : []);
 const nums = (vs: (Json | undefined)[]): number[] =>
   vs.flatMap((v) => (Array.isArray(v) ? v : [v])).map(Number).filter((n) => !Number.isNaN(n));
 
+/** Objects.toDouble do Jolt: converte Number ou String numérica; o resto é ignorado. */
+const javaToDouble = (v: Json | undefined): number | undefined => {
+  if (typeof v === 'number') return v;
+  if (v instanceof JavaDouble) return (v as JavaDouble).n;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isNaN(n) ? undefined : n;
+  }
+  return undefined; // null, boolean, listas e objetos não entram na soma
+};
+
+/**
+ * Semântica de ListFunction do Jolt: um único argumento que é lista → seus
+ * elementos; vários argumentos → os próprios argumentos (sem achatar listas
+ * aninhadas); um único argumento escalar → função não se aplica (undefined).
+ */
+const listArgs = (a: (Json | undefined)[]): (Json | undefined)[] | undefined => {
+  if (a.length === 0) return undefined;
+  if (a.length === 1) {
+    if (Array.isArray(a[0])) return a[0].length === 0 ? undefined : a[0];
+    return undefined;
+  }
+  return a;
+};
+
+/** Soma no estilo Java: ignora elementos não conversíveis; sempre retorna a soma (0 se nenhum). */
+const javaSum = (a: (Json | undefined)[], toN: (v: Json | undefined) => number | undefined): number | undefined => {
+  const list = listArgs(a);
+  if (list === undefined) return undefined;
+  let sum = 0;
+  for (const el of list) {
+    const n = toN(el);
+    if (n !== undefined) sum += n;
+  }
+  return sum;
+};
+
+/** Objects.toInteger/toLong: converte e trunca elemento a elemento. */
+const javaToInt = (v: Json | undefined): number | undefined => {
+  const n = javaToDouble(v);
+  return n === undefined ? undefined : Math.trunc(n);
+};
+
 type Fn = (args: (Json | undefined)[]) => Json | undefined;
 
 const FUNCTIONS: Record<string, Fn> = {
@@ -200,11 +243,14 @@ const FUNCTIONS: Record<string, Fn> = {
     const ns = nums(a);
     return ns.length ? ns.reduce((x, y) => x + y, 0) : undefined;
   },
-  intSum: (a) => {
-    const s = FUNCTIONS.sum(a);
-    return s === undefined ? undefined : Math.trunc(Number(s));
+  // Somas com a semântica exata do Jolt (Math.java): elementos não numéricos
+  // (listas, null, strings não numéricas) são IGNORADOS e a soma sempre é
+  // retornada — doubleSum([lista], null) = 0.0, não a soma achatada da lista.
+  intSum: (a) => javaSum(a, javaToInt),
+  doubleSum: (a) => {
+    const s = javaSum(a, javaToDouble);
+    return s === undefined ? undefined : jdouble(s);
   },
-  doubleSum: (a) => jdouble(Number(FUNCTIONS.sum(a))),
   doubleSubtract: (a) => {
     const [x, y] = nums(a);
     return x === undefined || y === undefined ? undefined : jdouble(x - y);
@@ -242,7 +288,14 @@ const FUNCTIONS: Record<string, Fn> = {
     if (Array.isArray(v)) return v.filter((x) => x !== null);
     if (isPlainObject(v)) {
       const out: Record<string, Json> = {};
-      for (const [k, val] of Object.entries(v)) if (val !== null) out[k] = val;
+      const order: string[] = [];
+      for (const k of objKeys(v)) {
+        if (v[k] !== null) {
+          out[k] = v[k];
+          order.push(k);
+        }
+      }
+      setKeyOrder(out, order);
       return out;
     }
     return v;
@@ -295,12 +348,12 @@ function modifyWalk(spec: Record<string, Json>, target: Json, walked: ModifyLeve
   for (const [specKey, specVal] of Object.entries(spec)) {
     let keys: string[];
     if (specKey === '*') {
-      keys = isArr ? (target as Json[]).map((_v, i) => String(i)) : Object.keys(target as Record<string, Json>);
+      keys = isArr ? (target as Json[]).map((_v, i) => String(i)) : objKeys(target as Record<string, Json>);
     } else if (specKey.includes('|')) {
       keys = specKey.split('|').map((s) => s.trim());
     } else if (specKey.includes('*')) {
       const re = starToRegex(specKey);
-      keys = (isArr ? (target as Json[]).map((_v, i) => String(i)) : Object.keys(target as Record<string, Json>)).filter((k) => re.test(k));
+      keys = (isArr ? (target as Json[]).map((_v, i) => String(i)) : objKeys(target as Record<string, Json>)).filter((k) => re.test(k));
     } else {
       keys = [specKey];
     }
@@ -311,7 +364,7 @@ function modifyWalk(spec: Record<string, Json>, target: Json, walked: ModifyLeve
       const cur: Json | undefined = isArr ? (target as Json[])[idx] : (target as Record<string, Json>)[key];
       const set = (v: Json) => {
         if (isArr) (target as Json[])[idx] = v;
-        else (target as Record<string, Json>)[key] = v;
+        else setObjKey(target as Record<string, Json>, key, v);
       };
 
       if (isPlainObject(specVal)) {

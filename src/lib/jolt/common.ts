@@ -13,9 +13,104 @@ export function isPlainObject(v: unknown): v is Record<string, Json> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+// ---------------------------------------------------------------- ordem de chaves
+//
+// O Jolt (Java) usa LinkedHashMap: a ordem de inserção das chaves é preservada.
+// Objetos JS reordenam chaves inteiras ("81" aparece antes de "91" mesmo inserida
+// depois), então registramos a ordem real de inserção à parte, num WeakMap.
+
+const KEY_ORDER = new WeakMap<object, string[]>();
+
+/** Define `obj[key] = value` registrando a ordem de inserção (LinkedHashMap). */
+export function setObjKey(obj: Record<string, Json>, key: string, value: Json): void {
+  if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+    let order = KEY_ORDER.get(obj);
+    if (!order) {
+      order = Object.keys(obj);
+      KEY_ORDER.set(obj, order);
+    }
+    order.push(key);
+  }
+  obj[key] = value;
+}
+
+/** Substitui a ordem registrada de um objeto (ex.: sortr). */
+export function setKeyOrder(obj: Record<string, Json>, order: string[]): void {
+  KEY_ORDER.set(obj, [...order]);
+}
+
+/** Chaves do objeto na ordem de inserção registrada (fallback: Object.keys). */
+export function objKeys(obj: Record<string, Json>): string[] {
+  const order = KEY_ORDER.get(obj);
+  if (!order) return Object.keys(obj);
+  const own = new Set(Object.keys(obj));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const k of order) {
+    if (own.has(k) && !seen.has(k)) {
+      out.push(k);
+      seen.add(k);
+    }
+  }
+  for (const k of own) if (!seen.has(k)) out.push(k);
+  return out;
+}
+
+/**
+ * Cópia profunda que preserva a ordem registrada das chaves e normaliza valores
+ * com toJSON (ex.: JavaDouble → número), com a mesma semântica do round-trip por
+ * JSON que existia antes: `undefined` em objeto some, em array vira null.
+ */
 export function deepCopy<T>(v: T): T {
-  if (v === undefined) return v;
-  return JSON.parse(JSON.stringify(v)) as T;
+  if (v === null || typeof v !== 'object') return v;
+  return copyJson(v as unknown as Json) as unknown as T;
+}
+
+function copyJson(x: Json): Json {
+  if (x === null || typeof x !== 'object') return x;
+  const withToJson = x as { toJSON?: () => Json };
+  if (typeof withToJson.toJSON === 'function') return withToJson.toJSON();
+  if (Array.isArray(x)) {
+    const out: Json[] = [];
+    for (let i = 0; i < x.length; i++) {
+      const el = x[i];
+      out.push(el === undefined ? null : copyJson(el));
+    }
+    return out;
+  }
+  const src = x as Record<string, Json>;
+  const out: Record<string, Json> = {};
+  const order: string[] = [];
+  for (const k of objKeys(src)) {
+    const val = src[k];
+    if (val === undefined) continue;
+    out[k] = copyJson(val);
+    order.push(k);
+  }
+  KEY_ORDER.set(out, order);
+  return out;
+}
+
+/** JSON.stringify que respeita a ordem de chaves registrada (indentação de 2). */
+export function joltStringify(v: Json | undefined, indent = 2): string {
+  const pad = (n: number) => ' '.repeat(n * indent);
+  const go = (x: Json | undefined, depth: number): string => {
+    if (x === undefined || x === null) return 'null';
+    if (typeof x !== 'object') return JSON.stringify(x) ?? 'null';
+    const withToJson = x as { toJSON?: () => Json };
+    if (typeof withToJson.toJSON === 'function') return go(withToJson.toJSON(), depth);
+    if (Array.isArray(x)) {
+      if (x.length === 0) return '[]';
+      const items = Array.from({ length: x.length }, (_v, i) => pad(depth + 1) + go(x[i], depth + 1));
+      return `[\n${items.join(',\n')}\n${pad(depth)}]`;
+    }
+    const obj = x as Record<string, Json>;
+    const keys = objKeys(obj).filter((k) => obj[k] !== undefined);
+    if (keys.length === 0) return '{}';
+    const items = keys.map((k) => `${pad(depth + 1)}${JSON.stringify(k)}: ${go(obj[k], depth + 1)}`);
+    return `{\n${items.join(',\n')}\n${pad(depth)}}`;
+  };
+  return go(v, 0);
 }
 
 /** Nível da caminhada pela entrada: chave visitada + grupos capturados por curingas. */
@@ -139,10 +234,10 @@ export function orderSpecKeys(keys: string[]): string[] {
   return [...keys].sort((a, b) => score(b) - score(a));
 }
 
-/** Lista chaves de um contêiner (objeto ou array) como strings. */
+/** Lista chaves de um contêiner (objeto ou array) como strings, na ordem de inserção. */
 export function containerKeys(v: Json): string[] {
   if (Array.isArray(v)) return v.map((_x, i) => String(i));
-  if (isPlainObject(v)) return Object.keys(v);
+  if (isPlainObject(v)) return objKeys(v);
   return [];
 }
 

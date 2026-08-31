@@ -10,7 +10,7 @@ import { applyShift } from './shiftr';
 import { applyDefault, applyRemove, applySort, applyCardinality } from './ops';
 import { applyModify } from './modify';
 
-export { JoltError } from './common';
+export { JoltError, joltStringify } from './common';
 export type { Json } from './common';
 
 export const SUPPORTED_OPERATIONS = [

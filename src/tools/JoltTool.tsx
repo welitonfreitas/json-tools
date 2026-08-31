@@ -4,7 +4,7 @@ import JsonEditor from '../components/JsonEditor';
 import CopyButton from '../components/CopyButton';
 import { usePersistentState, loadPersisted } from '../lib/persist';
 import { tryParseJson } from '../lib/jsonUtils';
-import { joltTransformSteps, SUPPORTED_OPERATIONS } from '../lib/jolt';
+import { joltTransformSteps, joltStringify, SUPPORTED_OPERATIONS } from '../lib/jolt';
 import { DEFAULT_TAB_ID } from '../components/Tabs';
 import DiffView from '../components/DiffView';
 import Split from '../components/Split';
@@ -97,7 +97,9 @@ function computeRun(input: string, spec: string): RunState {
       if (s.error !== undefined) {
         steps.push({ label: s.operation, ok: false, text: s.error });
       } else {
-        steps.push({ label: s.operation, ok: true, text: JSON.stringify(s.output, null, 2) ?? 'null' });
+        // joltStringify preserva a ordem de inserção das chaves (LinkedHashMap),
+        // que o JSON.stringify perderia para chaves numéricas como "91"/"81"
+        steps.push({ label: s.operation, ok: true, text: joltStringify(s.output) });
       }
     }
   } catch (e) {
