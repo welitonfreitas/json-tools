@@ -15,6 +15,7 @@ import {
   orderSpecKeys,
   containerKeys,
   containerGet,
+  setObjKey,
 } from './common';
 
 type OutputHolder = { root: Json | undefined };
@@ -97,7 +98,7 @@ function writeOutput(holder: OutputHolder, steps: PathStep[], value: Json): void
     Array.isArray(parent) ? parent[parentKey as number] : (parent as Record<string, Json>)[parentKey as string];
   const setCur = (v: Json): void => {
     if (Array.isArray(parent)) parent[parentKey as number] = v;
-    else (parent as Record<string, Json>)[parentKey as string] = v;
+    else setObjKey(parent as Record<string, Json>, parentKey as string, v);
   };
 
   for (let i = 0; i < steps.length; i++) {
@@ -137,13 +138,13 @@ function writeOutput(holder: OutputHolder, steps: PathStep[], value: Json): void
       const copied = deepCopy(value);
       if (existing === undefined) {
         if (Array.isArray(container)) container[nextKey as number] = copied;
-        else (container as Record<string, Json>)[String(nextKey)] = copied;
+        else setObjKey(container as Record<string, Json>, String(nextKey), copied);
       } else if (Array.isArray(existing)) {
         existing.push(copied);
       } else {
         const wrapped: Json = [existing, copied];
         if (Array.isArray(container)) container[nextKey as number] = wrapped;
-        else (container as Record<string, Json>)[String(nextKey)] = wrapped;
+        else setObjKey(container as Record<string, Json>, String(nextKey), wrapped);
       }
     } else {
       parent = cur as Json[] | Record<string, Json>;

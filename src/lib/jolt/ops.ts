@@ -1,6 +1,6 @@
 // Operações Jolt: default, remove, sort e cardinality.
 
-import { Json, JoltError, isPlainObject, deepCopy, starToRegex } from './common';
+import { Json, JoltError, isPlainObject, deepCopy, starToRegex, objKeys, setObjKey, setKeyOrder } from './common';
 
 // ---------------------------------------------------------------- defaultr
 
@@ -19,7 +19,7 @@ function defaultWalk(spec: Record<string, Json>, target: Json): void {
     const keys: string[] = [];
     if (specKey === '*') {
       if (isArr) keys.push(...(target as Json[]).map((_v, i) => String(i)));
-      else keys.push(...Object.keys(target as Record<string, Json>));
+      else keys.push(...objKeys(target as Record<string, Json>));
     } else if (specKey.includes('|')) {
       keys.push(...specKey.split('|').map((s) => s.trim()));
     } else {
@@ -37,13 +37,13 @@ function defaultWalk(spec: Record<string, Json>, target: Json): void {
           if (specKey === '*') continue; // '*' só se aplica a chaves existentes
           container = inferContainer(specVal);
           if (isArr) (target as Json[])[idx] = container;
-          else (target as Record<string, Json>)[key] = container;
+          else setObjKey(target as Record<string, Json>, key, container);
         }
         defaultWalk(specVal, container);
       } else if (existing === undefined) {
         if (specKey === '*') continue;
         if (isArr) (target as Json[])[idx] = deepCopy(specVal);
-        else (target as Record<string, Json>)[key] = deepCopy(specVal);
+        else setObjKey(target as Record<string, Json>, key, deepCopy(specVal));
       }
     }
   }
@@ -63,7 +63,7 @@ function matchingKeys(specKey: string, target: Json): string[] {
   const all = Array.isArray(target)
     ? target.map((_v, i) => String(i))
     : isPlainObject(target)
-      ? Object.keys(target)
+      ? objKeys(target)
       : [];
   if (specKey === '*') return all;
   if (specKey.includes('|')) {
@@ -110,7 +110,9 @@ export function applySort(input: Json): Json {
   if (Array.isArray(input)) return input.map(applySort);
   if (isPlainObject(input)) {
     const out: Record<string, Json> = {};
-    for (const k of Object.keys(input).sort()) out[k] = applySort(input[k]);
+    const sorted = objKeys(input).sort();
+    for (const k of sorted) out[k] = applySort(input[k]);
+    setKeyOrder(out, sorted); // ordem alfabética mesmo para chaves numéricas
     return out;
   }
   return input;
@@ -127,7 +129,7 @@ function cardinalityWalk(spec: Record<string, Json>, target: Json): void {
       const cur: Json | undefined = Array.isArray(target) ? target[parseInt(k, 10)] : container[k];
       const set = (v: Json) => {
         if (Array.isArray(target)) target[parseInt(k, 10)] = v;
-        else container[k] = v;
+        else setObjKey(container, k, v);
       };
       if (specVal === 'ONE') {
         if (Array.isArray(cur)) set(cur.length > 0 ? cur[0] : null);

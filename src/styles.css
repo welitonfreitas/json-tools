@@ -449,6 +449,57 @@ pre {
   color: var(--text-dim);
 }
 
+/* ---------- painel de busca do CodeMirror (Ctrl+F) ---------- */
+
+.cm-search.cm-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 32px 6px 8px;
+  font-size: 12px;
+}
+
+.cm-search input,
+.cm-search button,
+.cm-search label {
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.cm-search input {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.cm-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.cm-search button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+
+.cm-search button:hover {
+  border-color: var(--accent);
+}
+
+.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 /* ---------- panes ---------- */
 
 .split {

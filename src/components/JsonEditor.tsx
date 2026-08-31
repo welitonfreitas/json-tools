@@ -3,7 +3,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
-import type { Extension } from '@codemirror/state';
+import { EditorState, type Extension } from '@codemirror/state';
+import { search } from '@codemirror/search';
 import { ThemeContext } from '../theme';
 import { pathAtPosition } from '../lib/jsonLocator';
 import { tryParseJson, formatBytes, copyToClipboard } from '../lib/jsonUtils';
@@ -28,6 +29,41 @@ const lightTheme = EditorView.theme({
   '&': { backgroundColor: '#ffffff' },
   '.cm-gutters': { backgroundColor: '#f4f6f8', color: '#9aa4b1', border: 'none' },
 });
+
+// IMPORTANTE: identidade estável. Um objeto literal inline faria o
+// @uiw/react-codemirror reconfigurar o editor a cada render, o que descarta
+// extensões anexadas dinamicamente — o painel de busca do Ctrl+F fechava
+// sozinho assim que a barra de status re-renderizava o componente.
+const BASIC_SETUP = {
+  foldGutter: true,
+  highlightActiveLine: true,
+  bracketMatching: true,
+  closeBrackets: true,
+  autocompletion: false,
+  highlightSelectionMatches: true,
+} as const;
+
+// Busca registrada explicitamente (não só anexada pelo atalho) + painel em pt-BR
+const SEARCH_EXTENSIONS: Extension[] = [
+  search({ top: true }),
+  EditorState.phrases.of({
+    'Find': 'Buscar',
+    'Replace': 'Substituir',
+    'next': 'próxima',
+    'previous': 'anterior',
+    'all': 'todas',
+    'match case': 'diferenciar maiúsculas',
+    'by word': 'palavra inteira',
+    'regexp': 'regex',
+    'replace': 'substituir',
+    'replace all': 'substituir todas',
+    'close': 'fechar',
+    'current match': 'ocorrência atual',
+    'replaced $ matches': '$ ocorrências substituídas',
+    'replaced match on line $': 'ocorrência substituída na linha $',
+    'on line': 'na linha',
+  }),
+];
 
 interface CursorInfo {
   line: number;
@@ -60,7 +96,7 @@ export default function JsonEditor({
   };
 
   const extensions = useMemo(() => {
-    const ext: Extension[] = [EditorView.lineWrapping];
+    const ext: Extension[] = [EditorView.lineWrapping, ...SEARCH_EXTENSIONS];
     if (!plainText) ext.push(json());
     if (theme === 'light') ext.push(lightTheme);
     if (showBar) {
@@ -105,14 +141,7 @@ export default function JsonEditor({
       placeholder={placeholder}
       theme={theme === 'dark' ? oneDark : 'light'}
       extensions={extensions}
-      basicSetup={{
-        foldGutter: true,
-        highlightActiveLine: true,
-        bracketMatching: true,
-        closeBrackets: true,
-        autocompletion: false,
-        highlightSelectionMatches: true,
-      }}
+      basicSetup={BASIC_SETUP}
       style={{ height: '100%', fontSize: '13px' }}
     />
   );
