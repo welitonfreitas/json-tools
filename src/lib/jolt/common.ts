@@ -183,6 +183,9 @@ export function resolveAt(token: string, walked: WalkLevel[]): Json | undefined 
     const level = levelUp(walked, parseInt(paren[1], 10));
     return lookupPath(level.value, resolvePath(paren[2] ?? ''));
   }
+  // Açúcar "@N" (só dígitos) = "@(N,)" — sobe N níveis (TransposePathElement do Jolt)
+  const digits = token.match(/^@(\d+)$/);
+  if (digits) return levelUp(walked, parseInt(digits[1], 10)).value;
   // Forma abreviada @foo.bar → nível 0
   const short = token.match(/^@(.+)$/);
   if (short) return lookupPath(levelUp(walked, 0).value, resolvePath(short[1]));

@@ -251,7 +251,10 @@ function walk(
 export function applyShift(spec: Json, input: Json): Json {
   if (!isPlainObject(spec)) throw new JoltError('A spec de "shift" deve ser um objeto');
   const holder: OutputHolder = { root: undefined };
-  const rootLevel: WalkLevel = { key: 'root', groups: ['root'], value: input, matchIndex: 0 };
-  walk(spec, input, [rootLevel], holder, new WeakMap());
+  // O Jolt empilha a raiz DUAS vezes: Shiftr.transform() adiciona um nível de raiz
+  // ao WalkedPath e a spec raiz se adiciona de novo ao aplicar. Referências como
+  // @(3,x) a partir de root>a>b alcançam a raiz em vez de estourar.
+  const rootLevel = (): WalkLevel => ({ key: 'root', groups: ['root'], value: input, matchIndex: 0 });
+  walk(spec, input, [rootLevel(), rootLevel()], holder, new WeakMap());
   return holder.root === undefined ? null : holder.root;
 }

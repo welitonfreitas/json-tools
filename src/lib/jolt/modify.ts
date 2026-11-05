@@ -66,6 +66,9 @@ function parseArg(arg: string, walked: ModifyLevel[]): Json | undefined {
         | Json
         | undefined;
     }
+    // Açúcar "@N" (só dígitos) = sobe N níveis
+    const dig = arg.match(/^@(\d+)$/);
+    if (dig) return levelValue(walked, parseInt(dig[1], 10));
     return lookupPath(levelValue(walked, 0), resolveAmpInPath(arg.slice(1), walked)) as Json | undefined;
   }
   if (arg.startsWith("'") && arg.endsWith("'")) return arg.slice(1, -1);
@@ -186,11 +189,22 @@ const FUNCTIONS: Record<string, Fn> = {
   },
   concat: (a) => a.filter((v) => v !== undefined && v !== null).map(String).join(''),
   join: (a) => {
-    const [sep, arr] = a;
-    return asArray(arr)
-      .filter((v) => v !== undefined && v !== null)
-      .map(String)
-      .join(String(sep));
+    // ArgDrivenListFunction do Jolt: o 1º argumento é o separador; o resto é a
+    // lista (um único argumento-lista é usado como está). Strings.join pula
+    // null/vazio mas anexa o separador após cada posição não-final preenchida.
+    const sep = String(a[0]);
+    const rest = a.slice(1);
+    const list = rest.length === 1 && Array.isArray(rest[0]) ? rest[0] : rest;
+    let sb = '';
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
+      if (v === undefined || v === null) continue;
+      const s = String(v);
+      if (s === '') continue;
+      sb += s;
+      if (i < list.length - 1) sb += sep;
+    }
+    return sb;
   },
   split: (a) => {
     const [sep, str] = a;
@@ -335,6 +349,8 @@ function evalRhs(rhs: Json, current: Json | undefined, walked: ModifyLevel[]): J
         | Json
         | undefined;
     }
+    const dig = rhs.match(/^@(\d+)$/);
+    if (dig) return levelValue(walked, parseInt(dig[1], 10));
     return lookupPath(levelValue(walked, 0), resolveAmpInPath(rhs.slice(1), walked)) as Json | undefined;
   }
   return rhs;
@@ -393,7 +409,8 @@ function modifyWalk(spec: Record<string, Json>, target: Json, walked: ModifyLeve
 export function applyModify(spec: Json, input: Json, overwrite: boolean): Json {
   if (!isPlainObject(spec)) throw new JoltError('A spec de "modify" deve ser um objeto');
   const out = deepCopy(input);
-  modifyWalk(spec, out, [{ key: 'root', value: out }], overwrite);
+  // Como no shift, o Modifier do Jolt empilha a raiz duas vezes (transform + spec raiz)
+  modifyWalk(spec, out, [{ key: 'root', value: out }, { key: 'root', value: out }], overwrite);
   // Normaliza os JavaDouble em números puros (toJSON) — o efeito de Double só vale
   // dentro da operação (ex.: concat na mesma spec), como uma passagem por JSON no Jolt
   return deepCopy(out);
